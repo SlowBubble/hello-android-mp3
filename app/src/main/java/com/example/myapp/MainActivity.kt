@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
@@ -44,6 +45,18 @@ fun NavigationHost(
 
                         if (found.isNotEmpty()) {
                             playerViewModel.setSongs(found)
+                            
+                            // Save folder URI for persistence
+                            val storageManager = com.example.myapp.data.StorageManager(context)
+                            storageManager.setFolderUri(folderUri)
+                            
+                            // Restore last active track if it exists
+                            val lastActiveTrackName = storageManager.getLastActiveTrack()
+                            val lastActiveSong = found.find { it.title == lastActiveTrackName }
+                            if (lastActiveSong != null) {
+                                playerViewModel.setCurrentSong(lastActiveSong)
+                            }
+                            
                             navController.navigate("songList") {
                                 popUpTo("filePicker") { inclusive = true }
                             }
@@ -61,6 +74,7 @@ fun NavigationHost(
         composable("songList") {
             SongListScreen(
                 songs = songs,
+                currentSongId = currentSong?.id,
                 onSongClick = { song ->
                     playerViewModel.setCurrentSong(song)
                     navController.navigate("player")
@@ -70,8 +84,14 @@ fun NavigationHost(
 
         composable("player") {
             if (currentSong != null) {
+                val context = LocalContext.current
+                val songToPlay = currentSong
+                LaunchedEffect(songToPlay) {
+                    val storageManager = com.example.myapp.data.StorageManager(context)
+                    storageManager.setLastActiveTrack(songToPlay?.title)
+                }
                 PlayerScreen(
-                    song = currentSong!!,
+                    song = songToPlay!!,
                     isPlaying = isPlaying,
                     onPlayPause = { service ->
                         if (isPlaying) {
@@ -89,6 +109,16 @@ fun NavigationHost(
                     onFastForward = { service ->
                         val duration = service.getDuration()
                         val newPos = (service.getCurrentPosition() + 9_000L)
+                            .let { if (duration > 0) it.coerceAtMost(duration) else it }
+                        service.seekTo(newPos)
+                    },
+                    onRewind45 = { service ->
+                        val newPos = (service.getCurrentPosition() - 45_000L).coerceAtLeast(0L)
+                        service.seekTo(newPos)
+                    },
+                    onFastForward45 = { service ->
+                        val duration = service.getDuration()
+                        val newPos = (service.getCurrentPosition() + 45_000L)
                             .let { if (duration > 0) it.coerceAtMost(duration) else it }
                         service.seekTo(newPos)
                     },

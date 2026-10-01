@@ -1,5 +1,11 @@
 # MP3 Player - UI/UX Features
 
+**Context**: The HTML/JS MP3 player in #[[file:html-app/mp3-player/]] is complete and fully functional. This document defines the features we want to replicate when building the native Android/Kotlin version of the app.
+
+**Reference Implementation**: #[[file:html-app/mp3-player/index.html]] | #[[file:html-app/mp3-player/main.js]]
+
+When in doubt about feature details or current behavior, refer to the HTML and JavaScript files above—they are the source of truth for how the app currently works and what we're implementing in Kotlin.
+
 ## m3 - Polish & Refinement
 UI/UX improvements and accessibility enhancements for the core player experience.
 

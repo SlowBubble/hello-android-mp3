@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.21"
 }
 
 android {
@@ -44,6 +45,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.navigation:navigation-compose:2.8.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     debugImplementation("androidx.compose.ui:ui-tooling:1.6.7")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.7")
 }

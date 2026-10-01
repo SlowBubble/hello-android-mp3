@@ -20,6 +20,16 @@ fun FilePickerScreen(
     var selectedFolder by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
+    // Auto-load saved folder on first launch
+    LaunchedEffect(Unit) {
+        val storageManager = com.example.myapp.data.StorageManager(context)
+        val savedFolder = storageManager.getFolderUri()
+        if (savedFolder != null) {
+            selectedFolder = savedFolder
+            onFolderSelected(savedFolder)
+        }
+    }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->

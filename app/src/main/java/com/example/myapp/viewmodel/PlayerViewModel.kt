@@ -17,6 +17,12 @@ class PlayerViewModel : ViewModel() {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    private val _currentPosition = MutableStateFlow(0L)
+    val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
+
+    private val _duration = MutableStateFlow(0L)
+    val duration: StateFlow<Long> = _duration.asStateFlow()
+
     fun setSongs(newSongs: List<Song>) {
         _songs.value = newSongs
     }
@@ -33,4 +39,13 @@ class PlayerViewModel : ViewModel() {
     fun togglePlayPause() {
         _isPlaying.value = !_isPlaying.value
     }
+
+    fun setCurrentPosition(position: Long) {
+        _currentPosition.value = position
+    }
+
+    fun setDuration(duration: Long) {
+        _duration.value = duration
+    }
 }
+

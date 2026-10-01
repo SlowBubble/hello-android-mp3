@@ -22,7 +22,9 @@ class SongScanner(private val context: Context) {
         val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED
         )
 
         context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
@@ -31,13 +33,17 @@ class SongScanner(private val context: Context) {
             val idCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
             val nameCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
             val mimeCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val sizeCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
+            val lastModCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
 
             while (cursor.moveToNext()) {
                 val docId = cursor.getString(idCol)
                 val name = cursor.getString(nameCol) ?: continue
                 val mime = cursor.getString(mimeCol) ?: ""
+                val fileSize = cursor.getLong(sizeCol)
+                val lastModified = cursor.getLong(lastModCol)
 
-                Log.d("SongScanner", "Item: $name, MIME: $mime")
+                Log.d("SongScanner", "Item: $name, MIME: $mime, Size: $fileSize, Modified: $lastModified")
 
                 val isMp3 = mime.equals("audio/mpeg", ignoreCase = true) ||
                         name.lowercase().endsWith(".mp3")
@@ -52,7 +58,9 @@ class SongScanner(private val context: Context) {
                             title = title,
                             artist = "Unknown Artist",
                             uri = docUri,
-                            duration = 0L
+                            duration = 0L,
+                            fileSize = fileSize,
+                            dateModified = lastModified
                         )
                     )
                     Log.d("SongScanner", "Added MP3: $title → $docUri")
