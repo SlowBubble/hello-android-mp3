@@ -76,8 +76,18 @@ fun NavigationHost(
                 songs = songs,
                 currentSongId = currentSong?.id,
                 onSongClick = { song ->
-                    playerViewModel.setCurrentSong(song)
-                    navController.navigate("player")
+                    // Save current track progress before switching
+                    if (currentSong != null && currentSong?.id != song.id) {
+                        playerViewModel.setCurrentSong(song)
+                        navController.navigate("player")
+                    } else if (currentSong?.id == song.id) {
+                        // Same song, just navigate
+                        navController.navigate("player")
+                    } else {
+                        // First song
+                        playerViewModel.setCurrentSong(song)
+                        navController.navigate("player")
+                    }
                 }
             )
         }

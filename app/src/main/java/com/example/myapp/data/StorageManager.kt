@@ -37,7 +37,8 @@ class StorageManager(private val context: Context) {
 
     fun getTrackProgress(trackName: String): TrackProgress? {
         return try {
-            val json = prefs.getString("$KEY_TRACK_PROGRESS$trackName", null) ?: return null
+            val json = prefs.getString("$KEY_TRACK_PROGRESS$trackName", null)
+            if (json == null) return null
             Json.decodeFromString<TrackProgress>(json)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -142,14 +143,3 @@ class StorageManager(private val context: Context) {
         prefs.edit().clear().apply()
     }
 }
-
-@Serializable
-private data class SerializableTrackProgress(
-    val trackName: String,
-    val currentTime: Long = 0,
-    val duration: Long = 0,
-    val lastPlayed: Long = 0,
-    val firstListened: Long? = null,
-    val totalListeningTime: Long = 0,
-    val playCount: Int = 0
-)

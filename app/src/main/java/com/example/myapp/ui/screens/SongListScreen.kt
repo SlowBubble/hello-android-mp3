@@ -223,8 +223,15 @@ fun SongListItem(
                 formatFileSize(song.fileSize)
             }
 
+            // Current time / total time display if track has been played
+            val timeDisplayText = if (progress?.duration != null && progress.duration > 0 && progress.currentTime > 0) {
+                "${formatTime(progress.currentTime)} / ${formatTime(progress.duration)}"
+            } else {
+                durationText
+            }
+
             Text(
-                durationText,
+                timeDisplayText,
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f)
             )
@@ -234,30 +241,36 @@ fun SongListItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .background(
-                        color = Color.White.copy(alpha = 0.2f),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp)
-                    )
             ) {
-                val progressPercent = if (progress?.duration != null && progress.duration > 0) {
-                    (progress.currentTime.toFloat() / progress.duration.toFloat()) * 100
-                } else {
-                    if (maxFileSize > 0) {
-                        (song.fileSize.toFloat() / maxFileSize.toFloat()) * 100
-                    } else {
-                        0f
+                // Gray bar: proportional to track duration vs longest track
+                if (maxFileSize > 0 && (progress?.duration ?: song.fileSize) > 0) {
+                    val trackDuration = progress?.duration ?: song.fileSize
+                    val grayWidth = (trackDuration.toFloat() / maxFileSize.toFloat()) * 100
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(grayWidth / 100f)
+                            .background(
+                                color = Color.White.copy(alpha = 0.4f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp)
+                            )
+                    ) {
+                        // Green bar: only shown if there's saved progress
+                        if (progress?.duration != null && progress.duration > 0 && progress.currentTime > 0) {
+                            val greenWidth = (progress.currentTime.toFloat() / progress.duration.toFloat()) * 100
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(greenWidth / 100f)
+                                    .background(
+                                        color = Color(0xFF4ade80),
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp)
+                                    )
+                            )
+                        }
                     }
                 }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progressPercent / 100f)
-                        .background(
-                            color = Color(0xFF4ade80),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp)
-                        )
-                )
             }
         }
 

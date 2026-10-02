@@ -1,9 +1,12 @@
 package com.example.myapp.data
 
+import kotlinx.serialization.Serializable
+
 /**
  * Represents playback progress and metadata for a track.
  * Persisted to local storage via SharedPreferences JSON serialization.
  */
+@Serializable
 data class TrackProgress(
     val trackName: String,
     val currentTime: Long = 0,           // Current playback position in ms

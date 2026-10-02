@@ -40,9 +40,27 @@ fun PlayerScreen(
     var connected by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
+    var playbackRate by remember { mutableStateOf(1.0f) }
+    var currentChapter by remember { mutableStateOf(0) }
 
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
+
+    // Helper function to save progress
+    fun saveProgress() {
+        if (service != null) {
+            val pos = service!!.getCurrentPosition()
+            val dur = service!!.getDuration()
+            
+            if (dur > 0) {
+                val progress = storageManager.getTrackProgress(song.title) 
+                    ?: com.example.myapp.data.TrackProgress(song.title)
+                
+                val updated = progress.copy(currentTime = pos, duration = dur)
+                storageManager.saveTrackProgress(song.title, updated)
+            }
+        }
+    }
 
     val connection = remember(context) {
         object : ServiceConnection {
@@ -50,7 +68,8 @@ fun PlayerScreen(
                 if (binder is PlayerService.LocalBinder) {
                     service = binder.getService()
                     connected = true
-                    service?.playUri(song.uri.toString())
+                    // Load but don't play yet - will seek then play in LaunchedEffect
+                    service?.loadUri(song.uri.toString())
                 }
             }
 
@@ -73,30 +92,66 @@ fun PlayerScreen(
         }
     }
 
-    // Update progress periodically
-    LaunchedEffect(isPlaying, service) {
-        while (isPlaying && service != null) {
+    // Restore saved position then start playing
+    LaunchedEffect(song, service, connected) {
+        if (connected && service != null) {
+            // Wait for ExoPlayer to load metadata
+            var attempts = 0
+            while (service!!.getDuration() <= 0 && attempts < 20) {
+                delay(100)
+                attempts++
+            }
+            
+            val progress = storageManager.getTrackProgress(song.title)
+            if (progress != null && progress.currentTime > 0 && progress.duration > 0) {
+                // Seek to saved position before playing
+                service!!.seekTo(progress.currentTime)
+            }
+            
+            // Now start playing
+            service!!.play()
+        }
+    }
+
+    // Continuously update UI state from service
+    LaunchedEffect(service, connected) {
+        while (connected && service != null) {
             currentPosition = service!!.getCurrentPosition()
-            if (duration == 0L) {
-                duration = service!!.getDuration()
-                // Save duration to storage
-                if (duration > 0) {
-                    val progress = storageManager.getTrackProgress(song.title) 
-                        ?: com.example.myapp.data.TrackProgress(song.title)
-                    storageManager.saveTrackProgress(
-                        song.title,
-                        progress.copy(duration = duration)
-                    )
-                }
+            val newDuration = service!!.getDuration()
+            if (newDuration > 0 && newDuration != duration) {
+                duration = newDuration
             }
-
-            // Check if track is near completion (within 30 seconds of end)
-            if (duration > 0 && duration - currentPosition < 30000) {
-                // Auto-hide track on completion
-                storageManager.hideTrack(song.title)
-            }
-
             delay(500)
+        }
+    }
+
+    // Save progress every 5 seconds (M2 spec)
+    LaunchedEffect(service, connected, song) {
+        while (connected && service != null) {
+            delay(5000) // 5 seconds as per M2 spec
+            saveProgress()
+        }
+    }
+
+    // Update chapter display
+    LaunchedEffect(currentPosition, duration) {
+        if (duration > 0) {
+            val chapterSize = duration / 10
+            currentChapter = minOf(9, (currentPosition / chapterSize).toInt())
+        }
+    }
+
+    // Auto-hide on completion
+    LaunchedEffect(currentPosition, duration) {
+        if (duration > 0 && duration - currentPosition < 30000 && duration - currentPosition > 29000) {
+            storageManager.hideTrack(song.title)
+        }
+    }
+
+    // Save when screen is disposed (user navigates away)
+    DisposableEffect(Unit) {
+        onDispose {
+            saveProgress()
         }
     }
 
@@ -138,7 +193,10 @@ fun PlayerScreen(
                             }
                         } else {
                             // Single tap: toggle play/pause
-                            service?.let { onPlayPause(it) }
+                            service?.let { 
+                                onPlayPause(it)
+                                saveProgress()
+                            }
                         }
                     }
                 )
@@ -160,7 +218,10 @@ fun PlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = onBack,
+                    onClick = {
+                        saveProgress()
+                        onBack()
+                    },
                     modifier = Modifier
                         .size(48.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -201,6 +262,14 @@ fun PlayerScreen(
                     song.artist,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.8f)
+                )
+
+                // M2: Playback rate display
+                Text(
+                    "${String.format("%.2f", playbackRate)}x",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
 
@@ -263,6 +332,58 @@ fun PlayerScreen(
                     }
                 }
 
+                // M2: Chapter navigation and playback rate controls
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { service?.previousChapter() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text("⏮ Ch", fontSize = 14.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = { 
+                            service?.let { 
+                                playbackRate = it.getPlaybackRate()
+                                // Cycle playback rate: 1.0 → 1.15 → 1.25 → 1.35 → 1.0
+                                val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
+                                val currentIndex = rates.indexOf(playbackRate.let { r ->
+                                    rates.minByOrNull { kotlin.math.abs(it - r) } ?: 1.0f
+                                })
+                                val nextIndex = (currentIndex + 1) % rates.size
+                                it.setPlaybackRate(rates[nextIndex])
+                                playbackRate = rates[nextIndex]
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = { service?.nextChapter() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text("Ch ⏭", fontSize = 14.sp, color = Color.White)
+                    }
+                }
+
                 // 7-second skip buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -320,6 +441,13 @@ fun PlayerScreen(
                         Text("+45s ⏩", fontSize = 14.sp, color = Color.White)
                     }
                 }
+
+                // M2: Chapter info display
+                Text(
+                    "Chapter ${currentChapter + 1}/10",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
             }
         }
     }
