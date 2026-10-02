@@ -30,6 +30,7 @@ fun SongListScreen(
     songs: List<Song>,
     currentSongId: Long? = null,
     onSongClick: (Song) -> Unit,
+    onFolderButtonClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -81,7 +82,43 @@ fun SongListScreen(
                 .height(48.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Sort button
+            // Left button - Reselect folder
+            Button(
+                onClick = { onFolderButtonClick?.invoke() },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                ),
+                enabled = onFolderButtonClick != null
+            ) {
+                Text(
+                    "Folder",
+                    fontSize = 14.sp,
+                    color = Color.White
+                )
+            }
+
+            // Middle button - Toggle hidden
+            Button(
+                onClick = { showHidden = !showHidden },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (showHidden) Color(0xFF4ade80).copy(alpha = 0.3f)
+                    else Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                )
+            ) {
+                Text(
+                    if (showHidden) "Show All" else "Hidden",
+                    fontSize = 14.sp,
+                    color = Color.White
+                )
+            }
+
+            // Right button - Sort
             Button(
                 onClick = {
                     sortMode = (sortMode + 1) % SortMode.values().size
@@ -96,24 +133,6 @@ fun SongListScreen(
             ) {
                 Text(
                     SortMode.values()[sortMode].label,
-                    fontSize = 14.sp,
-                    color = Color.White
-                )
-            }
-
-            // Toggle hidden button
-            Button(
-                onClick = { showHidden = !showHidden },
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (showHidden) Color(0xFF4ade80).copy(alpha = 0.3f)
-                    else Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                )
-            ) {
-                Text(
-                    if (showHidden) "Show All" else "Hidden",
                     fontSize = 14.sp,
                     color = Color.White
                 )

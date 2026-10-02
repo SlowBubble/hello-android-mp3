@@ -5,10 +5,13 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -33,42 +36,103 @@ fun NavigationHost(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
-    NavHost(navController = navController, startDestination = "filePicker") {
-        composable("filePicker") {
-            FilePickerScreen(
-                onFolderSelected = { folderUri ->
-                    Log.d("MainActivity", "Folder selected: $folderUri")
-                    try {
-                        val scanner = SongScanner(context)
-                        val found = scanner.scanFolderForMp3s(folderUri)
-                        Log.d("MainActivity", "Found ${found.size} MP3 files")
+    // Folder picker launcher
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            try {
+                // Take a persistent permission
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                
+                // Scan folder
+                val scanner = SongScanner(context)
+                val found = scanner.scanFolderForMp3s(it.toString())
+                Log.d("MainActivity", "Found ${found.size} MP3 files")
 
-                        if (found.isNotEmpty()) {
-                            playerViewModel.setSongs(found)
-                            
-                            // Save folder URI for persistence
-                            val storageManager = com.example.myapp.data.StorageManager(context)
-                            storageManager.setFolderUri(folderUri)
-                            
-                            // Restore last active track if it exists
-                            val lastActiveTrackName = storageManager.getLastActiveTrack()
-                            val lastActiveSong = found.find { it.title == lastActiveTrackName }
-                            if (lastActiveSong != null) {
-                                playerViewModel.setCurrentSong(lastActiveSong)
-                            }
-                            
-                            navController.navigate("songList") {
-                                popUpTo("filePicker") { inclusive = true }
-                            }
-                        } else {
-                            Toast.makeText(context, "No MP3 files found in that folder", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Scan error", e)
-                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                if (found.isNotEmpty()) {
+                    playerViewModel.setSongs(found)
+                    
+                    // Save folder URI
+                    val storageManager = com.example.myapp.data.StorageManager(context)
+                    storageManager.setFolderUri(it.toString())
+                    
+                    // Restore last active track if it exists
+                    val lastActiveTrackName = storageManager.getLastActiveTrack()
+                    val lastActiveSong = found.find { song -> song.title == lastActiveTrackName }
+                    if (lastActiveSong != null) {
+                        playerViewModel.setCurrentSong(lastActiveSong)
                     }
+                    
+                    navController.navigate("songList") {
+                        popUpTo("songList") { inclusive = true }
+                    }
+                } else {
+                    Toast.makeText(context, "No MP3 files found in that folder", Toast.LENGTH_SHORT).show()
                 }
-            )
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Scan error", e)
+                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Auto-load saved folder on app start
+    var hasAutoLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!hasAutoLoaded) {
+            hasAutoLoaded = true
+            val storageManager = com.example.myapp.data.StorageManager(context)
+            val savedFolder = storageManager.getFolderUri()
+            
+            if (savedFolder != null) {
+                try {
+                    val scanner = SongScanner(context)
+                    val found = scanner.scanFolderForMp3s(savedFolder)
+                    
+                    if (found.isNotEmpty()) {
+                        playerViewModel.setSongs(found)
+                        
+                        // Restore last active track
+                        val lastActiveTrackName = storageManager.getLastActiveTrack()
+                        val lastActiveSong = found.find { song -> song.title == lastActiveTrackName }
+                        if (lastActiveSong != null) {
+                            playerViewModel.setCurrentSong(lastActiveSong)
+                        }
+                        
+                        navController.navigate("songList") {
+                            popUpTo("start") { inclusive = true }
+                        }
+                    } else {
+                        // Saved folder has no MP3s, launch picker
+                        folderPickerLauncher.launch(null)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Auto-load error", e)
+                    // On error, launch picker
+                    folderPickerLauncher.launch(null)
+                }
+            } else {
+                // No saved folder, launch picker
+                folderPickerLauncher.launch(null)
+            }
+        }
+    }
+
+    NavHost(navController = navController, startDestination = "start") {
+        composable("start") {
+            // Empty placeholder screen while loading
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Color(0xFF667eea)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White)
+            }
         }
 
         composable("songList") {
@@ -88,6 +152,10 @@ fun NavigationHost(
                         playerViewModel.setCurrentSong(song)
                         navController.navigate("player")
                     }
+                },
+                onFolderButtonClick = {
+                    // Launch folder picker directly
+                    folderPickerLauncher.launch(null)
                 }
             )
         }

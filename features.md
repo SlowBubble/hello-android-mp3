@@ -6,28 +6,6 @@
 
 When in doubt about feature details or current behavior, refer to the HTML and JavaScript files above—they are the source of truth for how the app currently works and what we're implementing in Kotlin.
 
-## m3 - Polish & Refinement
-UI/UX improvements and accessibility enhancements for the core player experience.
-
-### Home Page Polish
-- **Visual Feedback**: Ensure disabled/unavailable buttons have clear visual states to prevent user confusion
-- **Empty State Messaging**: When no tracks are loaded, display helpful guidance text suggesting folder selection
-- **Loading States**: Show subtle loading indicators when scanning folder contents (if delayed)
-- **Responsive Spacing**: Ensure consistent padding and margins across different screen sizes
-
-### Player Page Polish
-- **Track Title Overflow**: Gracefully handle long track names with ellipsis or text truncation
-- **Visual Hierarchy**: Make primary controls (play/pause) more prominent than secondary controls
-- **Safe Area Awareness**: Account for notches and rounded corners on modern mobile devices
-- **Gesture Hints**: Subtle visual indicators (text overlay or icon) explaining tap zones (single/double tap regions)
-
-### Accessibility
-- **High Contrast Support**: Provide dark mode option with sufficient color contrast ratios
-- **Touch Target Sizes**: Ensure all buttons meet minimum 48x48px touch target size
-- **Screen Reader Support**: Add ARIA labels to all interactive elements
-- **Keyboard Navigation**: Support keyboard controls for desktop testing
-
----
 
 ## m2 - Session Persistence & Advanced Playback
 Track progress persistence, remembering where users left off, and advanced playback controls.
