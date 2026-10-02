@@ -2,6 +2,7 @@ package com.example.myapp.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -141,5 +142,16 @@ class StorageManager(private val context: Context) {
 
     fun clearAll() {
         prefs.edit().clear().apply()
+    }
+
+    // ============== File Deletion ==============
+
+    fun deleteTrack(trackTitle: String, trackUri: android.net.Uri) {
+        try {
+            android.provider.DocumentsContract.deleteDocument(context.contentResolver, trackUri)
+            Log.d("StorageManager", "Deleted file: $trackTitle at $trackUri")
+        } catch (e: Exception) {
+            Log.e("StorageManager", "Error deleting file: $trackTitle", e)
+        }
     }
 }

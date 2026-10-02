@@ -156,6 +156,11 @@ fun NavigationHost(
                 onFolderButtonClick = {
                     // Launch folder picker directly
                     folderPickerLauncher.launch(null)
+                },
+                onSongDeleted = { deletedSong ->
+                    // Remove deleted song from the list
+                    val updatedSongs = songs.filter { it.id != deletedSong.id }
+                    playerViewModel.setSongs(updatedSongs)
                 }
             )
         }

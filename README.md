@@ -1,5 +1,10 @@
 
-# m1f
+# m1f ✓
+For the hidden page:
+- no need to have folder and sort buttons
+- Show All should say Home instead
+- For each item, let's have an X button to the right of the restore that actually delete the file from the phone
+
 # m1e
 Fix these
 

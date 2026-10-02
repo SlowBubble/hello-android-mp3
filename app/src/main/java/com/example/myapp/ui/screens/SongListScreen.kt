@@ -31,6 +31,7 @@ fun SongListScreen(
     currentSongId: Long? = null,
     onSongClick: (Song) -> Unit,
     onFolderButtonClick: (() -> Unit)? = null,
+    onSongDeleted: ((Song) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -76,67 +77,93 @@ fun SongListScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Controls
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Left button - Reselect folder
-            Button(
-                onClick = { onFolderButtonClick?.invoke() },
+        // Controls - different for home and hidden pages
+        if (showHidden) {
+            // Hidden page: only "Home" button
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                ),
-                enabled = onFolderButtonClick != null
+                    .fillMaxWidth()
+                    .height(48.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Text(
-                    "Folder",
-                    fontSize = 14.sp,
-                    color = Color.White
-                )
+                Button(
+                    onClick = { showHidden = !showHidden },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                    )
+                ) {
+                    Text(
+                        "Home",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
             }
-
-            // Middle button - Toggle hidden
-            Button(
-                onClick = { showHidden = !showHidden },
+        } else {
+            // Home page: Folder, Hidden, and Sort buttons
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (showHidden) Color(0xFF4ade80).copy(alpha = 0.3f)
-                    else Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                )
+                    .fillMaxWidth()
+                    .height(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    if (showHidden) "Show All" else "Hidden",
-                    fontSize = 14.sp,
-                    color = Color.White
-                )
-            }
+                // Left button - Reselect folder
+                Button(
+                    onClick = { onFolderButtonClick?.invoke() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                    ),
+                    enabled = onFolderButtonClick != null
+                ) {
+                    Text(
+                        "Folder",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
 
-            // Right button - Sort
-            Button(
-                onClick = {
-                    sortMode = (sortMode + 1) % SortMode.values().size
-                    storageManager.setSortIndex(sortMode)
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                )
-            ) {
-                Text(
-                    SortMode.values()[sortMode].label,
-                    fontSize = 14.sp,
-                    color = Color.White
-                )
+                // Middle button - Toggle hidden
+                Button(
+                    onClick = { showHidden = !showHidden },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                    )
+                ) {
+                    Text(
+                        "Hidden",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
+
+                // Right button - Sort
+                Button(
+                    onClick = {
+                        sortMode = (sortMode + 1) % SortMode.values().size
+                        storageManager.setSortIndex(sortMode)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                    )
+                ) {
+                    Text(
+                        SortMode.values()[sortMode].label,
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
             }
         }
 
@@ -169,7 +196,15 @@ fun SongListScreen(
                         onRestoreClick = {
                             storageManager.unhideTrack(song.title)
                             hiddenTracksRefresh++
-                        }
+                        },
+                        onDeleteClick = {
+                            // Delete the file from disk
+                            storageManager.deleteTrack(song.title, song.uri)
+                            storageManager.unhideTrack(song.title) // Also remove from hidden list
+                            onSongDeleted?.invoke(song) // Notify parent to remove from list
+                            hiddenTracksRefresh++
+                        },
+                        showingHidden = showHidden
                     )
                 }
 
@@ -207,7 +242,9 @@ fun SongListItem(
     isHidden: Boolean,
     onSongClick: () -> Unit,
     onHideClick: () -> Unit,
-    onRestoreClick: () -> Unit
+    onRestoreClick: () -> Unit,
+    onDeleteClick: (() -> Unit)? = null,
+    showingHidden: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -296,22 +333,65 @@ fun SongListItem(
             }
         }
 
-        // Hide/Restore button
-        Button(
-            onClick = if (isHidden) onRestoreClick else onHideClick,
-            modifier = Modifier
-                .size(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isHidden) Color(0xFF4ade80).copy(alpha = 0.2f)
-                else Color(0xFFFFFFFF).copy(alpha = 0.1f)
-            ),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Text(
-                if (isHidden) "↺" else "✕",
-                fontSize = 20.sp,
-                color = Color.White
-            )
+        // Buttons - different behavior on hidden vs home page
+        if (showingHidden) {
+            // Hidden page: show both restore and delete buttons
+            Row(
+                modifier = Modifier
+                    .width(108.dp)
+                    .height(50.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Restore button
+                Button(
+                    onClick = onRestoreClick,
+                    modifier = Modifier
+                        .size(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4ade80).copy(alpha = 0.2f)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        "↺",
+                        fontSize = 20.sp,
+                        color = Color.White
+                    )
+                }
+                // Delete button
+                Button(
+                    onClick = { onDeleteClick?.invoke() },
+                    modifier = Modifier
+                        .size(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF4444).copy(alpha = 0.3f)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        "✕",
+                        fontSize = 20.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        } else {
+            // Home page: show hide button
+            Button(
+                onClick = onHideClick,
+                modifier = Modifier
+                    .size(50.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.1f)
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    "✕",
+                    fontSize = 20.sp,
+                    color = Color.White
+                )
+            }
         }
     }
 }
