@@ -331,6 +331,35 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // 7-second skip buttons (above progress bar)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { service?.let { onRewind(it) } },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text("⏪ -7s", fontSize = 14.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = { service?.let { onFastForward(it) } },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text("+7s ⏩", fontSize = 14.sp, color = Color.White)
+                    }
+                }
+
                 // Progress bar and time display
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -392,35 +421,6 @@ fun PlayerScreen(
                     )
                 ) {
                     Text("🏠 Home", fontSize = 16.sp, color = Color.White)
-                }
-
-                // 7-second skip buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { service?.let { onRewind(it) } },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("⏪ -7s", fontSize = 14.sp, color = Color.White)
-                    }
-                    Button(
-                        onClick = { service?.let { onFastForward(it) } },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("+7s ⏩", fontSize = 14.sp, color = Color.White)
-                    }
                 }
             }
         }

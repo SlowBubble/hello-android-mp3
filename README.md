@@ -1,4 +1,7 @@
 
+# m1i ✓
+- Let's have the rewind and forward 7s button go to above the progress bar but still inside the buttons container
+
 # m1h ✓
 - let's remove the prev and next chapter and the chapter 1/10 thing.
 - Move the home button to just below the progress bar above all the other buttons as a wide button
