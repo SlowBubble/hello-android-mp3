@@ -1,4 +1,13 @@
 
+# m1h
+- let's remove the prev and next chapter and the chapter 1/10 thing.
+- Move the home button to just below the progress bar above all the other buttons as a wide button
+
+# m1g ✓
+- Let's move the hidden button to the bottom after the items, so folder and sort buttons have more space
+# m1g
+- Let's move the hidden button to the bottom after the items, so folder and sort buttons have more space
+
 # m1f ✓
 For the hidden page:
 - no need to have folder and sort buttons

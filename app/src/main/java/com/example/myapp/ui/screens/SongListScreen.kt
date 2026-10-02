@@ -103,7 +103,7 @@ fun SongListScreen(
                 }
             }
         } else {
-            // Home page: Folder, Hidden, and Sort buttons
+            // Home page: Folder and Sort buttons only (Hidden moved to bottom)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -123,23 +123,6 @@ fun SongListScreen(
                 ) {
                     Text(
                         "Folder",
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
-                }
-
-                // Middle button - Toggle hidden
-                Button(
-                    onClick = { showHidden = !showHidden },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                    )
-                ) {
-                    Text(
-                        "Hidden",
                         fontSize = 14.sp,
                         color = Color.White
                     )
@@ -228,6 +211,27 @@ fun SongListScreen(
                         }
                     }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Hidden button at the bottom (only on home page)
+        if (!showHidden) {
+            Button(
+                onClick = { showHidden = !showHidden },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                )
+            ) {
+                Text(
+                    "Hidden",
+                    fontSize = 14.sp,
+                    color = Color.White
+                )
             }
         }
     }
