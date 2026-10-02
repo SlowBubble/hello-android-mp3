@@ -41,8 +41,9 @@ fun SongListScreen(
     }
     var showHidden by remember { mutableStateOf(false) }
     var visibleCount by remember { mutableIntStateOf(30) }
+    var hiddenTracksRefresh by remember { mutableIntStateOf(0) }
 
-    val hiddenTracks = remember(showHidden, songs) {
+    val hiddenTracks = remember(showHidden, songs, hiddenTracksRefresh) {
         storageManager.getHiddenTracks()
     }
 
@@ -163,9 +164,11 @@ fun SongListScreen(
                         onSongClick = { onSongClick(song) },
                         onHideClick = {
                             storageManager.hideTrack(song.title)
+                            hiddenTracksRefresh++
                         },
                         onRestoreClick = {
                             storageManager.unhideTrack(song.title)
+                            hiddenTracksRefresh++
                         }
                     )
                 }
