@@ -209,7 +209,7 @@ fun PlayerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top bar with back button
+            // Top bar with playback rate button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -218,9 +218,18 @@ fun PlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = {
-                        saveProgress()
-                        onBack()
+                    onClick = { 
+                        service?.let { 
+                            playbackRate = it.getPlaybackRate()
+                            // Cycle playback rate: 1.0 → 1.15 → 1.25 → 1.35 → 1.0
+                            val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
+                            val currentIndex = rates.indexOf(playbackRate.let { r ->
+                                rates.minByOrNull { kotlin.math.abs(it - r) } ?: 1.0f
+                            })
+                            val nextIndex = (currentIndex + 1) % rates.size
+                            it.setPlaybackRate(rates[nextIndex])
+                            playbackRate = rates[nextIndex]
+                        }
                     },
                     modifier = Modifier
                         .size(48.dp),
@@ -229,7 +238,7 @@ fun PlayerScreen(
                     ),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text("🏠", fontSize = 20.sp)
+                    Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
                 }
 
                 Text(
@@ -241,36 +250,73 @@ fun PlayerScreen(
                 Box(modifier = Modifier.size(48.dp))
             }
 
-            // Main track display (centered, tappable)
-            Column(
+            // Main track display with 45s skip buttons on sides
+            Row(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    song.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp),
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // Left: -45s button
+                Button(
+                    onClick = { service?.let { onRewind45(it) } },
+                    modifier = Modifier
+                        .width(60.dp)
+                        .fillMaxHeight(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.15f)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("⏪", fontSize = 24.sp, color = Color.White)
+                }
 
-                Text(
-                    song.artist,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
+                // Center: Track info
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        song.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(16.dp),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-                // M2: Playback rate display
-                Text(
-                    "${String.format("%.2f", playbackRate)}x",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                    Text(
+                        song.artist,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+
+                    // M2: Playback rate display
+                    Text(
+                        "${String.format("%.2f", playbackRate)}x",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                // Right: +45s button
+                Button(
+                    onClick = { service?.let { onFastForward45(it) } },
+                    modifier = Modifier
+                        .width(60.dp)
+                        .fillMaxHeight(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.15f)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("⏩", fontSize = 24.sp, color = Color.White)
+                }
             }
 
             // Controls section - moved up, no play/pause button
@@ -332,56 +378,20 @@ fun PlayerScreen(
                     }
                 }
 
-                // M2: Chapter navigation and playback rate controls
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Home button - wide button below progress bar
+                Button(
+                    onClick = {
+                        saveProgress()
+                        onBack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.15f)
+                    )
                 ) {
-                    Button(
-                        onClick = { service?.previousChapter() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("⏮ Ch", fontSize = 14.sp, color = Color.White)
-                    }
-                    Button(
-                        onClick = { 
-                            service?.let { 
-                                playbackRate = it.getPlaybackRate()
-                                // Cycle playback rate: 1.0 → 1.15 → 1.25 → 1.35 → 1.0
-                                val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
-                                val currentIndex = rates.indexOf(playbackRate.let { r ->
-                                    rates.minByOrNull { kotlin.math.abs(it - r) } ?: 1.0f
-                                })
-                                val nextIndex = (currentIndex + 1) % rates.size
-                                it.setPlaybackRate(rates[nextIndex])
-                                playbackRate = rates[nextIndex]
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
-                    }
-                    Button(
-                        onClick = { service?.nextChapter() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("Ch ⏭", fontSize = 14.sp, color = Color.White)
-                    }
+                    Text("🏠 Home", fontSize = 16.sp, color = Color.White)
                 }
 
                 // 7-second skip buttons
@@ -412,42 +422,6 @@ fun PlayerScreen(
                         Text("+7s ⏩", fontSize = 14.sp, color = Color.White)
                     }
                 }
-
-                // 45-second skip buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { service?.let { onRewind45(it) } },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("⏪ -45s", fontSize = 14.sp, color = Color.White)
-                    }
-                    Button(
-                        onClick = { service?.let { onFastForward45(it) } },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("+45s ⏩", fontSize = 14.sp, color = Color.White)
-                    }
-                }
-
-                // M2: Chapter info display
-                Text(
-                    "Chapter ${currentChapter + 1}/10",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
             }
         }
     }

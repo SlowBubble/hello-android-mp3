@@ -1,7 +1,9 @@
 
-# m1h
+# m1h ✓
 - let's remove the prev and next chapter and the chapter 1/10 thing.
 - Move the home button to just below the progress bar above all the other buttons as a wide button
+- Move the 1x speed button to where the home button was before
+- Finally, add the rewind and forward 45s buttons to also span the left and right side of the panel above the progress bar
 
 # m1g ✓
 - Let's move the hidden button to the bottom after the items, so folder and sort buttons have more space
