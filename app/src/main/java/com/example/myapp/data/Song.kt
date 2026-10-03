@@ -3,8 +3,7 @@ package com.example.myapp.data
 import android.net.Uri
 
 data class Song(
-    val id: Long,  // WARNING: Unstable ID! Based on list position at scan time.
-                   // TODO(m4): Use stable identifiers like URI hash or file hash instead.
+    val id: Long,  // Stable ID: hash of URI path. Same file always has same ID.
     val title: String,
     val artist: String,
     val uri: Uri,
@@ -15,4 +14,11 @@ data class Song(
     val firstListened: Long? = null,
     val lastPlayed: Long? = null,
     val totalListeningTime: Long = 0L // in milliseconds
-)
+) {
+    companion object {
+        // Generate stable ID from URI
+        fun generateStableId(uri: Uri): Long {
+            return uri.toString().hashCode().toLong()
+        }
+    }
+}

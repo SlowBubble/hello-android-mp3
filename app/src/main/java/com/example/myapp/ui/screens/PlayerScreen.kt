@@ -61,6 +61,7 @@ fun PlayerScreen(
         
         val hiddenSet = hiddenTracks.toSet()
         val sortIndex = storageManager.getSortIndex()
+        val currentSongUri = song.uri.toString()
         
         // Estimate duration from file size (128 kbps average bitrate)
         fun estimateDurationLocal(bytes: Long): Long {
@@ -81,8 +82,8 @@ fun PlayerScreen(
             else -> songs.sortedBy { it.dateModified }
         }
         
-        // Find current song in sorted list
-        val currentIndex = sorted.indexOfFirst { it.id == song.id }
+        // Find current song in sorted list by URI (stable identifier)
+        val currentIndex = sorted.indexOfFirst { it.uri.toString() == currentSongUri }
         if (currentIndex < 0) return null
         
         // Find next non-hidden track after current position
@@ -208,16 +209,21 @@ fun PlayerScreen(
     // Auto-hide on completion
     LaunchedEffect(currentPosition, duration) {
         if (duration > 0 && duration - currentPosition < 30000 && duration - currentPosition > 29000) {
-            // Track is finishing, hide it and play next
-            storageManager.hideTrack(song.title)
-            
-            // Find next track in sorted order
-            val nextSong = getNextTrackInSortOrder()
-            
-            if (nextSong != null) {
-                onTrackHideAndNext(nextSong)
-            } else {
-                // No more non-hidden tracks, go back to home
+            try {
+                // Track is finishing, hide it and play next
+                storageManager.hideTrack(song.title)
+                
+                // Find next track in sorted order
+                val nextSong = getNextTrackInSortOrder()
+                
+                if (nextSong != null) {
+                    onTrackHideAndNext(nextSong)
+                } else {
+                    // No more non-hidden tracks, go back to home
+                    onBack()
+                }
+            } catch (e: Exception) {
+                Log.e("PlayerScreen", "Error auto-advancing to next track: ${e.message}", e)
                 onBack()
             }
         }

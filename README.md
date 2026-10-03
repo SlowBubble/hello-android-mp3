@@ -1,5 +1,44 @@
 
 
+# m4a
+- milestone: replace all unstable Song ID usage with stable URI-based identification
+- root cause of crashes: Song IDs were assigned sequentially at scan time (`id = result.size.toLong()`), causing crashes when song lists were rescanned or reordered
+  - song selection crashes: when clicking a song, the ID might not match after a rescan, causing wrong song to play
+  - auto-advance crashes: when current track completes, finding the next song by ID fails if IDs have shifted
+  - demarcation rendering crashes: Compose keys based on unstable IDs could become duplicate
+- solution: implement stable ID generation based on URI hashes
+  - added `Song.generateStableId(uri: Uri): Long = uri.toString().hashCode().toLong()`
+  - changed SongScanner from position-based IDs to URI-based stable IDs
+  - updated all ID-based comparisons to use URI comparisons for clarity and correctness
+- affected components:
+  - **MainActivity**: song play-pause logic now uses `.uri == song.uri` instead of `.id == song.id`
+  - **SongListScreen**: demarcation and selection now uses URI comparisons
+  - **PlayerScreen**: already uses URI-based comparisons (from m3c)
+  - **Demarcation**: uses stable `nextSongId` which now works correctly
+  - **SongScanner**: generates stable IDs from URIs instead of assignment order
+- result: IDs are now immutable across app restarts and rescans
+  - song selections always work correctly
+  - auto-advance always finds the next song
+  - demarcation keys are unique and stable
+  - no more crashes due to ID mismatches
+
+# m3c
+- bug fix: potential crash when track completes and auto-advances to next track
+- root cause: `getNextTrackInSortOrder()` was using unstable Song ID to find current song
+  - Song IDs can change when lists are rescanned or reordered
+  - when current song ID doesn't match any song in the sorted list, returns -1
+  - causes `indexOfFirst` to fail and return null for nextSong
+  - could crash if null nextSong is passed to `onTrackHideAndNext`
+- solution: changed from ID-based lookup to URI-based lookup
+  - changed from: `sorted.indexOfFirst { it.id == song.id }`
+  - changed to: `sorted.indexOfFirst { it.uri.toString() == currentSongUri }`
+  - URIs are stable identifiers (file paths), never change
+  - ensures next song is correctly found even if IDs change
+- added error handling: wrapped auto-advance logic in try-catch
+  - prevents crashes during track completion
+  - logs errors for debugging
+  - falls back to home screen if next song fails
+
 # m3b
 - bug fix: app crashes with IllegalArgumentException when clicking different songs
 - root cause: SongListScreen was generating duplicate Compose LazyColumn keys for demarcations

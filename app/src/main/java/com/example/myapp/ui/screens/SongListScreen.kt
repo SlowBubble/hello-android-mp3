@@ -98,7 +98,7 @@ private fun shouldAddDemarcation(
     pinnedSong: Song?
 ): Boolean {
     // After pinned track, always add demarcation
-    if (pinnedSong != null && prevSong.id == pinnedSong.id) {
+    if (pinnedSong != null && prevSong.uri == pinnedSong.uri) {
         return true
     }
 

@@ -141,8 +141,8 @@ fun NavigationHost(
                 songs = songs,
                 currentSongId = currentSong?.id,
                 onSongClick = { song ->
-                    if (currentSong?.id == song.id && isPlaying) {
-                        // Same song and actively playing — just navigate, don't restart
+                    if (currentSong?.uri == song.uri && isPlaying) {
+                        // Same song (by URI) and actively playing — just navigate, don't restart
                         navController.navigate("player")
                     } else {
                         // Different song, or same song but paused — load and play
@@ -181,8 +181,8 @@ fun NavigationHost(
                     // Only 1 (or 0) folders in history — do nothing
                 },
                 onSongDeleted = { deletedSong ->
-                    // Remove deleted song from the list
-                    val updatedSongs = songs.filter { it.id != deletedSong.id }
+                    // Remove deleted song from the list (by URI for stability)
+                    val updatedSongs = songs.filter { it.uri != deletedSong.uri }
                     playerViewModel.setSongs(updatedSongs)
                 }
             )
@@ -199,7 +199,7 @@ fun NavigationHost(
                 
                 val storageManager = com.example.myapp.data.StorageManager(context)
                 val hiddenTracks = storageManager.getHiddenTracks()
-                val currentSongIndex = songs.indexOfFirst { it.id == songToPlay?.id }
+                val currentSongIndex = songs.indexOfFirst { it.uri == songToPlay?.uri }
                 
                 PlayerScreen(
                     song = songToPlay!!,

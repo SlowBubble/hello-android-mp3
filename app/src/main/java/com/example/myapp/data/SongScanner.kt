@@ -54,7 +54,7 @@ class SongScanner(private val context: Context) {
                     val title = name.removeSuffix(".mp3").removeSuffix(".MP3")
                     result.add(
                         Song(
-                            id = result.size.toLong(),
+                            id = Song.generateStableId(docUri),
                             title = title,
                             artist = "Unknown Artist",
                             uri = docUri,
