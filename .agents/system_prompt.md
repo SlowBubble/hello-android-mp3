@@ -12,3 +12,11 @@ When you finish implementing features, fixing bugs, or making any code changes t
 3. Report back with a summary of what was changed and confirm the installation completed successfully
 
 This deployment step is mandatory for all code changes and should be executed automatically as the final step of any implementation task.
+
+## On-Device Implementation Failures
+When the user states that a fix or implementation didn't work on their physical phone:
+1. Do not immediately rewrite code or ask for manually copied errors.
+2. Immediately check recent error logs using `adb logcat -d *:E`.
+3. Filter for app-specific logs or crashes: `adb logcat -d | grep "com.yourcompany.yourapp"`.
+4. Verify whether the app was properly recompiled and installed by checking `./gradlew installDebug` status.
+5. Diagnose the root cause using the retrieved terminal logs before offering the next fix.

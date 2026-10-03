@@ -173,9 +173,17 @@ fun NavigationHost(
                     val storageManager = com.example.myapp.data.StorageManager(context)
                     storageManager.setLastActiveTrack(songToPlay?.title)
                 }
+                
+                val storageManager = com.example.myapp.data.StorageManager(context)
+                val hiddenTracks = storageManager.getHiddenTracks()
+                val currentSongIndex = songs.indexOfFirst { it.id == songToPlay?.id }
+                
                 PlayerScreen(
                     song = songToPlay!!,
                     isPlaying = isPlaying,
+                    songs = songs,
+                    hiddenTracks = hiddenTracks,
+                    currentSongIndex = currentSongIndex,
                     onPlayPause = { service ->
                         if (isPlaying) {
                             service.pause()
@@ -205,7 +213,12 @@ fun NavigationHost(
                             .let { if (duration > 0) it.coerceAtMost(duration) else it }
                         service.seekTo(newPos)
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onTrackHideAndNext = { nextSong ->
+                        playerViewModel.setCurrentSong(nextSong)
+                        playerViewModel.setIsPlaying(true)
+                        // Stay on player screen with new song
+                    }
                 )
             }
         }

@@ -1,4 +1,10 @@
 
+# m1j ✓
+
+- Add a button on the upper right (similar to the 1x button), that is an "X", it should move the current track to hidden and play the next track in the sorted list
+- When a track finishes playing, it should move the current track to hidden and play the next track in the sorted list
+
+
 # m1i ✓
 - Let's have the rewind and forward 7s button go to above the progress bar but still inside the buttons container
 

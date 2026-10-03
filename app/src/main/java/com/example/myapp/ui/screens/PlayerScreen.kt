@@ -34,6 +34,10 @@ fun PlayerScreen(
     onRewind45: (PlayerService) -> Unit,
     onFastForward45: (PlayerService) -> Unit,
     onBack: () -> Unit,
+    songs: List<Song> = emptyList(),
+    hiddenTracks: List<String> = emptyList(),
+    currentSongIndex: Int = 0,
+    onTrackHideAndNext: (nextSong: Song) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var service by remember { mutableStateOf<PlayerService?>(null) }
@@ -95,6 +99,9 @@ fun PlayerScreen(
     // Restore saved position then start playing
     LaunchedEffect(song, service, connected) {
         if (connected && service != null) {
+            // Load the new song URI
+            service!!.loadUri(song.uri.toString())
+            
             // Wait for ExoPlayer to load metadata
             var attempts = 0
             while (service!!.getDuration() <= 0 && attempts < 20) {
@@ -144,7 +151,20 @@ fun PlayerScreen(
     // Auto-hide on completion
     LaunchedEffect(currentPosition, duration) {
         if (duration > 0 && duration - currentPosition < 30000 && duration - currentPosition > 29000) {
+            // Track is finishing, hide it and play next
             storageManager.hideTrack(song.title)
+            
+            // Find next non-hidden track
+            val nextSong = songs.drop(currentSongIndex + 1).firstOrNull { nextTrack ->
+                !hiddenTracks.contains(nextTrack.title) && !song.title.equals(nextTrack.title)
+            }
+            
+            if (nextSong != null) {
+                onTrackHideAndNext(nextSong)
+            } else {
+                // No more non-hidden tracks, go back to home
+                onBack()
+            }
         }
     }
 
@@ -209,7 +229,7 @@ fun PlayerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top bar with playback rate button
+            // Top bar with playback rate button and hide button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -247,7 +267,33 @@ fun PlayerScreen(
                     color = Color.White
                 )
 
-                Box(modifier = Modifier.size(48.dp))
+                // X button: hide current track and play next
+                Button(
+                    onClick = {
+                        storageManager.hideTrack(song.title)
+                        
+                        // Find next non-hidden track
+                        val nextSong = songs.drop(currentSongIndex + 1).firstOrNull { nextTrack ->
+                            !hiddenTracks.contains(nextTrack.title) && !song.title.equals(nextTrack.title)
+                        }
+                        
+                        if (nextSong != null) {
+                            onTrackHideAndNext(nextSong)
+                        } else {
+                            // No more non-hidden tracks, go back to home
+                            onBack()
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF4444).copy(alpha = 0.3f)
+                    ),
+                    contentPadding = PaddingValues(0.dp),
+                    enabled = songs.isNotEmpty()
+                ) {
+                    Text("✕", fontSize = 20.sp, color = Color.White)
+                }
             }
 
             // Main track display with 45s skip buttons on sides
