@@ -1,4 +1,7 @@
 
+# m2a
+- is it possible to show play/pause, rewind/forward 10s buttons in the lock screen if our player is/has been recently active?
+
 # m1j ✓
 
 - Add a button on the upper right (similar to the 1x button), that is an "X", it should move the current track to hidden and play the next track in the sorted list
