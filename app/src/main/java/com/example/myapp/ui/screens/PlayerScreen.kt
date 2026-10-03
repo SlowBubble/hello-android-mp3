@@ -54,6 +54,42 @@ fun PlayerScreen(
     // Collect lastLoadedSongId from ViewModel to track across navigation
     val lastLoadedSongId by playerViewModel.lastLoadedSongId.collectAsState()
 
+    // Helper function to get the next track in sorted order (ignoring the pinned track)
+    fun getNextTrackInSortOrder(): Song? {
+        if (songs.isEmpty()) return null
+        
+        val hiddenSet = hiddenTracks.toSet()
+        val sortIndex = storageManager.getSortIndex()
+        
+        // Estimate duration from file size (128 kbps average bitrate)
+        fun estimateDurationLocal(bytes: Long): Long {
+            if (bytes <= 0) return 0
+            val BYTES_PER_SECOND = 16000L
+            return (bytes / BYTES_PER_SECOND) * 1000
+        }
+        
+        // Sort according to current sort mode, but without pinning the current track
+        val sorted = when (sortIndex) {
+            0 -> songs.sortedBy { track ->
+                storageManager.getTrackProgress(track.title)?.duration ?: estimateDurationLocal(track.fileSize)
+            }
+            1 -> songs.sortedByDescending { track ->
+                storageManager.getTrackProgress(track.title)?.duration ?: estimateDurationLocal(track.fileSize)
+            }
+            2 -> songs.sortedByDescending { it.dateModified }
+            else -> songs.sortedBy { it.dateModified }
+        }
+        
+        // Find current song in sorted list
+        val currentIndex = sorted.indexOfFirst { it.id == song.id }
+        if (currentIndex < 0) return null
+        
+        // Find next non-hidden track after current position
+        return sorted.drop(currentIndex + 1).firstOrNull { track ->
+            !hiddenSet.contains(track.title)
+        }
+    }
+
     // Helper function to save progress
     fun saveProgress() {
         if (service != null) {
@@ -169,10 +205,8 @@ fun PlayerScreen(
             // Track is finishing, hide it and play next
             storageManager.hideTrack(song.title)
             
-            // Find next non-hidden track
-            val nextSong = songs.drop(currentSongIndex + 1).firstOrNull { nextTrack ->
-                !hiddenTracks.contains(nextTrack.title) && !song.title.equals(nextTrack.title)
-            }
+            // Find next track in sorted order
+            val nextSong = getNextTrackInSortOrder()
             
             if (nextSong != null) {
                 onTrackHideAndNext(nextSong)
@@ -299,10 +333,8 @@ fun PlayerScreen(
                     onClick = {
                         storageManager.hideTrack(song.title)
                         
-                        // Find next non-hidden track
-                        val nextSong = songs.drop(currentSongIndex + 1).firstOrNull { nextTrack ->
-                            !hiddenTracks.contains(nextTrack.title) && !song.title.equals(nextTrack.title)
-                        }
+                        // Find next track in sorted order
+                        val nextSong = getNextTrackInSortOrder()
                         
                         if (nextSong != null) {
                             onTrackHideAndNext(nextSong)

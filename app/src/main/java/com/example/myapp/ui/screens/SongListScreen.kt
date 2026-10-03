@@ -17,12 +17,122 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapp.data.Song
 import com.example.myapp.data.StorageManager
+import java.text.SimpleDateFormat
+import java.util.*
 
 enum class SortMode(val label: String) {
     SHORTEST("Sort (Small)"),
     LONGEST("Sort (Big)"),
     NEWEST("Sort (Fresh)"),
     OLDEST("Sort (Stale)")
+}
+
+// Sealed class for list items (song or demarcation)
+sealed class SongListItem {
+    data class SongItem(val song: Song) : SongListItem()
+    data class Demarcation(val label: String) : SongListItem()
+}
+
+@Composable
+fun DemarcationDivider(label: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp, horizontal = 0.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.2f))
+        if (label.isNotEmpty()) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 10.sp
+            )
+        }
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.2f))
+    }
+}
+
+// Duration bucket definitions (in milliseconds)
+private data class DurationBucket(val maxMs: Long, val label: String)
+
+private val DURATION_BUCKETS = listOf(
+    DurationBucket(6 * 60 * 1000, "0–6 min"),
+    DurationBucket(11 * 60 * 1000, "6–11 min"),
+    DurationBucket(21 * 60 * 1000, "11–21 min"),
+    DurationBucket(41 * 60 * 1000, "21–41 min"),
+    DurationBucket(60 * 60 * 1000, "41 min–1 hr"),
+    DurationBucket(2 * 60 * 60 * 1000, "1–2 hr"),
+    DurationBucket(4 * 60 * 60 * 1000, "2–4 hr"),
+    DurationBucket(Long.MAX_VALUE, "4 hr+")
+)
+
+private fun getDurationBucket(durationMs: Long): Int {
+    return DURATION_BUCKETS.indexOfFirst { durationMs < it.maxMs }
+        .takeIf { it >= 0 } ?: 0
+}
+
+private fun getDurationBucketLabel(durationMs: Long): String {
+    return DURATION_BUCKETS[getDurationBucket(durationMs)].label
+}
+
+private fun getDateKey(timestampMs: Long): String {
+    val cal = Calendar.getInstance().apply { timeInMillis = timestampMs }
+    return "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.MONTH)}-${cal.get(Calendar.DAY_OF_MONTH)}"
+}
+
+private fun formatDateLabel(timestampMs: Long): String {
+    val formatter = SimpleDateFormat("EEE MMM dd a", Locale.getDefault())
+    return formatter.format(Date(timestampMs))
+}
+
+private fun shouldAddDemarcation(
+    prevSong: Song,
+    currentSong: Song,
+    prevProgress: com.example.myapp.data.TrackProgress?,
+    currentProgress: com.example.myapp.data.TrackProgress?,
+    sortMode: SortMode,
+    storageManager: StorageManager,
+    pinnedSong: Song?
+): Boolean {
+    // After pinned track, always add demarcation
+    if (pinnedSong != null && prevSong.id == pinnedSong.id) {
+        return true
+    }
+
+    return when (sortMode) {
+        SortMode.SHORTEST, SortMode.LONGEST -> {
+            val prevDuration = prevProgress?.duration ?: estimateDuration(prevSong.fileSize)
+            val currentDuration = currentProgress?.duration ?: estimateDuration(currentSong.fileSize)
+            val prevBucket = getDurationBucket(prevDuration)
+            val currentBucket = getDurationBucket(currentDuration)
+            prevBucket != currentBucket
+        }
+        SortMode.NEWEST, SortMode.OLDEST -> {
+            val prevKey = getDateKey(prevSong.dateModified)
+            val currentKey = getDateKey(currentSong.dateModified)
+            prevKey != currentKey
+        }
+    }
+}
+
+private fun getDemarcationLabel(
+    song: Song,
+    progress: com.example.myapp.data.TrackProgress?,
+    sortMode: SortMode,
+    storageManager: StorageManager
+): String? {
+    return when (sortMode) {
+        SortMode.SHORTEST, SortMode.LONGEST -> {
+            val duration = progress?.duration ?: estimateDuration(song.fileSize)
+            getDurationBucketLabel(duration)
+        }
+        SortMode.NEWEST, SortMode.OLDEST -> {
+            formatDateLabel(song.dateModified)
+        }
+    }
 }
 
 @Composable
@@ -186,31 +296,87 @@ fun SongListScreen(
 
                 item { Spacer(modifier = Modifier.height(16.dp)) }
 
-                items(visibleSongs, key = { it.id }) { song ->
-                    SongListItem(
-                        song = song,
-                        isActive = song.id == currentSongId,
-                        progress = storageManager.getTrackProgress(song.title),
-                        maxFileSize = songs.maxOf { it.fileSize },
-                        isHidden = hiddenTracks.contains(song.title),
-                        onSongClick = { onSongClick(song) },
-                        onHideClick = {
-                            storageManager.hideTrack(song.title)
-                            hiddenTracksRefresh++
-                        },
-                        onRestoreClick = {
-                            storageManager.unhideTrack(song.title)
-                            hiddenTracksRefresh++
-                        },
-                        onDeleteClick = {
-                            // Delete the file from disk
-                            storageManager.deleteTrack(song.title, song.uri)
-                            storageManager.unhideTrack(song.title) // Also remove from hidden list
-                            onSongDeleted?.invoke(song) // Notify parent to remove from list
-                            hiddenTracksRefresh++
-                        },
-                        showingHidden = showHidden
-                    )
+                // Build items with demarcations
+                val itemsWithDemarcations = mutableListOf<SongListItem>()
+                var prevSong: Song? = null
+                var prevProgress: com.example.myapp.data.TrackProgress? = null
+                val pinnedSong = sortedAndFiltered.find { it.id == currentSongId }
+
+                visibleSongs.forEachIndexed { index, song ->
+                    val progress = storageManager.getTrackProgress(song.title)
+                    val isCurrentTrack = song.id == currentSongId
+
+                    // Determine if we need a demarcation before this song
+                    val needsDemarcation = if (prevSong == null) {
+                        // First item: no demarcation before it
+                        false
+                    } else {
+                        // Check if we've crossed a boundary
+                        shouldAddDemarcation(
+                            prevSong!!, song,
+                            prevProgress, progress,
+                            SortMode.values()[sortMode],
+                            storageManager,
+                            pinnedSong
+                        )
+                    }
+
+                    if (needsDemarcation) {
+                        val label = getDemarcationLabel(
+                            song,
+                            progress,
+                            SortMode.values()[sortMode],
+                            storageManager
+                        )
+                        if (label != null) {
+                            itemsWithDemarcations.add(SongListItem.Demarcation(label))
+                        }
+                    }
+
+                    itemsWithDemarcations.add(SongListItem.SongItem(song))
+
+                    prevSong = song
+                    prevProgress = progress
+                }
+
+                items(itemsWithDemarcations, key = { item ->
+                    when (item) {
+                        is SongListItem.SongItem -> "song_${item.song.id}"
+                        is SongListItem.Demarcation -> "demarcation_${item.label}"
+                    }
+                }) { item ->
+                    when (item) {
+                        is SongListItem.SongItem -> {
+                            val song = item.song
+                            SongListItemComposable(
+                                song = song,
+                                isActive = song.id == currentSongId,
+                                progress = storageManager.getTrackProgress(song.title),
+                                maxFileSize = songs.maxOf { it.fileSize },
+                                isHidden = hiddenTracks.contains(song.title),
+                                onSongClick = { onSongClick(song) },
+                                onHideClick = {
+                                    storageManager.hideTrack(song.title)
+                                    hiddenTracksRefresh++
+                                },
+                                onRestoreClick = {
+                                    storageManager.unhideTrack(song.title)
+                                    hiddenTracksRefresh++
+                                },
+                                onDeleteClick = {
+                                    // Delete the file from disk
+                                    storageManager.deleteTrack(song.title, song.uri)
+                                    storageManager.unhideTrack(song.title) // Also remove from hidden list
+                                    onSongDeleted?.invoke(song) // Notify parent to remove from list
+                                    hiddenTracksRefresh++
+                                },
+                                showingHidden = showHidden
+                            )
+                        }
+                        is SongListItem.Demarcation -> {
+                            DemarcationDivider(item.label)
+                        }
+                    }
                 }
 
                 // Load more button
@@ -241,7 +407,7 @@ fun SongListScreen(
 }
 
 @Composable
-fun SongListItem(
+fun SongListItemComposable(
     song: Song,
     isActive: Boolean,
     progress: com.example.myapp.data.TrackProgress?,
@@ -286,7 +452,7 @@ fun SongListItem(
             val durationText = if (progress?.duration != null && progress.duration > 0) {
                 formatTime(progress.duration)
             } else {
-                formatFileSize(song.fileSize)
+                formatTime(estimateDuration(song.fileSize))
             }
 
             // Current time / total time display if track has been played
@@ -412,10 +578,10 @@ private fun List<Song>.sortedAccordingTo(
     
     val sorted = when (SortMode.values()[sortMode]) {
         SortMode.SHORTEST -> this.sortedBy { song ->
-            storageManager.getTrackProgress(song.title)?.duration ?: song.fileSize
+            storageManager.getTrackProgress(song.title)?.duration ?: estimateDuration(song.fileSize)
         }
         SortMode.LONGEST -> this.sortedByDescending { song ->
-            storageManager.getTrackProgress(song.title)?.duration ?: song.fileSize
+            storageManager.getTrackProgress(song.title)?.duration ?: estimateDuration(song.fileSize)
         }
         SortMode.NEWEST -> this.sortedByDescending { it.dateModified }
         SortMode.OLDEST -> this.sortedBy { it.dateModified }
@@ -441,9 +607,11 @@ private fun formatTime(ms: Long): String {
     }
 }
 
-private fun formatFileSize(bytes: Long): String {
-    return when {
-        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-        else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
-    }
+// Estimate duration from file size (assuming average bitrate of 128 kbps)
+// This is a reasonable estimate for typical MP3 files
+private fun estimateDuration(bytes: Long): Long {
+    if (bytes <= 0) return 0
+    // Bitrate: 128 kbps = 128 * 1000 / 8 = 16000 bytes per second
+    val BYTES_PER_SECOND = 16000L
+    return (bytes / BYTES_PER_SECOND) * 1000 // Return in milliseconds
 }

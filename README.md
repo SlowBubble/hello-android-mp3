@@ -1,5 +1,9 @@
 
 
+# m3a
+- Add demarcations similar to the html-js impl in the mp3-player folder
+    - Also see that impl to use estimated durations so we can sort things and display things by estimated durations instead of file size
+
 # m2f
 - bug: when I press on an item on the homepage that is already playing, it should be a no-op instead of triggering a seek and play (since there is a few seconds difference, causing a small rewind).
 
