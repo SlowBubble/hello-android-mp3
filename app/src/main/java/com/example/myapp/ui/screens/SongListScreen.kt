@@ -69,89 +69,6 @@ fun SongListScreen(
             .background(Color(0xFF667eea))
             .padding(16.dp)
     ) {
-        // Header
-        Text(
-            "MP3 Player",
-            style = MaterialTheme.typography.headlineSmall,
-            color = Color.White
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Controls - different for home and hidden pages
-        if (showHidden) {
-            // Hidden page: only "Home" button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Button(
-                    onClick = { showHidden = !showHidden },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                    )
-                ) {
-                    Text(
-                        "Home",
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
-                }
-            }
-        } else {
-            // Home page: Folder and Sort buttons only (Hidden moved to bottom)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Left button - Reselect folder
-                Button(
-                    onClick = { onFolderButtonClick?.invoke() },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                    ),
-                    enabled = onFolderButtonClick != null
-                ) {
-                    Text(
-                        "Folder",
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
-                }
-
-                // Right button - Sort
-                Button(
-                    onClick = {
-                        sortMode = (sortMode + 1) % SortMode.values().size
-                        storageManager.setSortIndex(sortMode)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                    )
-                ) {
-                    Text(
-                        SortMode.values()[sortMode].label,
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Playlist
         if (sortedAndFiltered.isEmpty()) {
             Text(
@@ -164,6 +81,82 @@ fun SongListScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Controls - different for home and hidden pages (as regular items, non-sticky)
+                item {
+                    if (showHidden) {
+                        // Hidden page: only "Home" button
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Button(
+                                onClick = { showHidden = !showHidden },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    "Home",
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    } else {
+                        // Home page: Switch button (left) and Sort button (right)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Left button - Switch (no-op for now)
+                            Button(
+                                onClick = { /* no-op for now */ },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    "Switch",
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
+
+                            // Right button - Sort
+                            Button(
+                                onClick = {
+                                    sortMode = (sortMode + 1) % SortMode.values().size
+                                    storageManager.setSortIndex(sortMode)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    SortMode.values()[sortMode].label,
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+
                 items(visibleSongs, key = { it.id }) { song ->
                     SongListItem(
                         song = song,
@@ -211,27 +204,53 @@ fun SongListScreen(
                         }
                     }
                 }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+                // Bottom row: Folder button (left of Hidden) - at the bottom of scrollable content
+                if (!showHidden) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Folder button
+                            Button(
+                                onClick = { onFolderButtonClick?.invoke() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                ),
+                                enabled = onFolderButtonClick != null
+                            ) {
+                                Text(
+                                    "Folder",
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
 
-        // Hidden button at the bottom (only on home page)
-        if (!showHidden) {
-            Button(
-                onClick = { showHidden = !showHidden },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                )
-            ) {
-                Text(
-                    "Hidden",
-                    fontSize = 14.sp,
-                    color = Color.White
-                )
+                            // Hidden button
+                            Button(
+                                onClick = { showHidden = !showHidden },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    "Hidden",
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
