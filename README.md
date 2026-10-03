@@ -1,6 +1,9 @@
 
+# m2b
+- Let's remove the MP3 Player title to save space
+
 # m2a
-- is it possible to show play/pause, rewind/forward 10s buttons in the lock screen if our player is/has been recently active?
+- is it possible to show play/pause in the lock screen if our player is/has been recently active?
 
 # m1j ✓
 
