@@ -38,6 +38,7 @@ fun PlayerScreen(
     hiddenTracks: List<String> = emptyList(),
     currentSongIndex: Int = 0,
     onTrackHideAndNext: (nextSong: Song) -> Unit = {},
+    playerViewModel: com.example.myapp.viewmodel.PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
     var service by remember { mutableStateOf<PlayerService?>(null) }
@@ -49,6 +50,9 @@ fun PlayerScreen(
 
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
+    
+    // Collect lastLoadedSongId from ViewModel to track across navigation
+    val lastLoadedSongId by playerViewModel.lastLoadedSongId.collectAsState()
 
     // Helper function to save progress
     fun saveProgress() {
@@ -72,8 +76,7 @@ fun PlayerScreen(
                 if (binder is PlayerService.LocalBinder) {
                     service = binder.getService()
                     connected = true
-                    // Load but don't play yet - will seek then play in LaunchedEffect
-                    service?.loadUri(song.uri.toString())
+                    // Don't load here — let LaunchedEffect handle it
                 }
             }
 
@@ -97,7 +100,7 @@ fun PlayerScreen(
     }
 
     // Track whether this is the first time we've connected for this song
-    var lastLoadedSongId by remember { mutableLongStateOf(-1L) }
+    // (removed local remember — now using ViewModel's persistent state)
 
     // Restore saved position then start playing — only when the song actually changes
     LaunchedEffect(song, service, connected) {
@@ -112,7 +115,7 @@ fun PlayerScreen(
 
             // Load the new song URI
             service!!.loadUri(song.uri.toString())
-            lastLoadedSongId = song.id
+            playerViewModel.setLastLoadedSongId(song.id)
 
             // Wait for ExoPlayer to load metadata
             var attempts = 0

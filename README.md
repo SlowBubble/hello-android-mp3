@@ -3,6 +3,13 @@
 # m2f
 - bug: when I press on an item on the homepage that is already playing, it should be a no-op instead of triggering a seek and play (since there is a few seconds difference, causing a small rewind).
 
+## Solution
+Prevent redundant audio reloads when navigating back to the player with the same song already playing. The tricky part is that `PlayerScreen` is a composable that gets recreated on navigation, losing local state. Solution:
+1. Track `lastLoadedSongId` in `PlayerViewModel` (shared across navigation) instead of local `remember`
+2. Pass the shared `PlayerViewModel` from `MainActivity` to `PlayerScreen` (don't create a new instance)
+3. Guard the load effect: if `lastLoadedSongId == currentSong.id && service.isPlaying()`, return early
+4. Result: same song, playing → navigate without reload; same song, paused or different song → load and play normally
+
 # m2e
 - Let's also add home button to the top of the player page where "Now Playing" (remove this text also) is sitting
 

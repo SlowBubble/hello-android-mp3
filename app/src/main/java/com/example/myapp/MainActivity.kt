@@ -207,6 +207,7 @@ fun NavigationHost(
                     songs = songs,
                     hiddenTracks = hiddenTracks,
                     currentSongIndex = currentSongIndex,
+                    playerViewModel = playerViewModel,
                     onPlayPause = { service ->
                         if (isPlaying) {
                             service.pause()

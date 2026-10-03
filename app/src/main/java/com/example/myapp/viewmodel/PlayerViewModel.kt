@@ -42,6 +42,14 @@ class PlayerViewModel : ViewModel() {
     private val _sortMode = MutableStateFlow(0)
     val sortMode: StateFlow<Int> = _sortMode.asStateFlow()
 
+    // M2f: Track the last loaded song ID to avoid reloading when navigating back
+    private val _lastLoadedSongId = MutableStateFlow(-1L)
+    val lastLoadedSongId: StateFlow<Long> = _lastLoadedSongId.asStateFlow()
+
+    fun setLastLoadedSongId(songId: Long) {
+        _lastLoadedSongId.value = songId
+    }
+
     fun setSongs(newSongs: List<Song>) {
         _songs.value = newSongs
     }
