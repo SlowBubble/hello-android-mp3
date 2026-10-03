@@ -348,6 +348,11 @@ fun SongListScreen(
                     when (item) {
                         is SongListItem.SongItem -> {
                             val song = item.song
+                            // Calculate max duration across all visible songs (using estimated duration)
+                            val maxDurationMs = visibleSongs.maxOfOrNull { s ->
+                                estimateDuration(s.fileSize)
+                            } ?: 1L
+                            
                             SongListItemComposable(
                                 song = song,
                                 isActive = song.id == currentSongId,
@@ -370,7 +375,8 @@ fun SongListScreen(
                                     onSongDeleted?.invoke(song) // Notify parent to remove from list
                                     hiddenTracksRefresh++
                                 },
-                                showingHidden = showHidden
+                                showingHidden = showHidden,
+                                maxDuration = maxDurationMs
                             )
                         }
                         is SongListItem.Demarcation -> {
@@ -417,7 +423,8 @@ fun SongListItemComposable(
     onHideClick: () -> Unit,
     onRestoreClick: () -> Unit,
     onDeleteClick: (() -> Unit)? = null,
-    showingHidden: Boolean = false
+    showingHidden: Boolean = false,
+    maxDuration: Long = 1L
 ) {
     Row(
         modifier = Modifier
@@ -474,10 +481,10 @@ fun SongListItemComposable(
                     .fillMaxWidth()
                     .height(6.dp)
             ) {
-                // Gray bar: proportional to track duration vs longest track
-                if (maxFileSize > 0 && (progress?.duration ?: song.fileSize) > 0) {
-                    val trackDuration = progress?.duration ?: song.fileSize
-                    val grayWidth = (trackDuration.toFloat() / maxFileSize.toFloat()) * 100
+                val trackDuration = estimateDuration(song.fileSize)
+                
+                if (maxDuration > 0 && trackDuration > 0) {
+                    val grayWidth = (trackDuration.toFloat() / maxDuration.toFloat()) * 100
                     
                     Box(
                         modifier = Modifier

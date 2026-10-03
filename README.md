@@ -1,4 +1,19 @@
 
+# m4c
+- bug fix: grey duration bar in song list was incorrectly scaled using file size instead of duration
+- root cause: progress bar width calculation compared track duration (milliseconds) against maximum file size (bytes)
+  - mixing two different units caused incorrect proportions
+  - longer files would show disproportionately wide bars regardless of actual duration
+- solution: calculate bar width using estimated duration consistently
+  - changed from: `(trackDuration / maxFileSize) * 100`
+  - changed to: `(estimateDuration(fileSize) / maxDuration) * 100`
+  - all durations now in milliseconds, all compared against maximum duration across visible songs
+  - grey bar always uses estimated duration (never actual saved duration) for consistent relative scaling
+- result: grey bar now accurately reflects relative track duration
+  - shorter tracks have proportionally smaller bars
+  - longer tracks have proportionally larger bars
+  - visual comparison between tracks is now meaningful
+
 # m4b ✓ - Track Playback Bug Fixes
 
 Fixed critical bugs where tracks would overlap during auto-advance to the next track.
