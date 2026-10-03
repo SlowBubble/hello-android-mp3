@@ -30,7 +30,7 @@ enum class SortMode(val label: String) {
 // Sealed class for list items (song or demarcation)
 sealed class SongListItem {
     data class SongItem(val song: Song) : SongListItem()
-    data class Demarcation(val label: String) : SongListItem()
+    data class Demarcation(val label: String, val nextSongId: Long) : SongListItem()
 }
 
 @Composable
@@ -329,7 +329,7 @@ fun SongListScreen(
                             storageManager
                         )
                         if (label != null) {
-                            itemsWithDemarcations.add(SongListItem.Demarcation(label))
+                            itemsWithDemarcations.add(SongListItem.Demarcation(label, song.id))
                         }
                     }
 
@@ -341,8 +341,8 @@ fun SongListScreen(
 
                 items(itemsWithDemarcations, key = { item ->
                     when (item) {
-                        is SongListItem.SongItem -> "song_${item.song.id}"
-                        is SongListItem.Demarcation -> "demarcation_${item.label}"
+                        is SongListItem.SongItem -> "song_${item.song.id}_${item.song.uri}"
+                        is SongListItem.Demarcation -> "demarcation_${item.label}_${item.nextSongId}"
                     }
                 }) { item ->
                     when (item) {

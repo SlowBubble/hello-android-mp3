@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -51,8 +52,8 @@ fun PlayerScreen(
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
     
-    // Collect lastLoadedSongId from ViewModel to track across navigation
-    val lastLoadedSongId by playerViewModel.lastLoadedSongId.collectAsState()
+    // Collect lastLoadedSongUri from ViewModel to track across navigation
+    val lastLoadedSongUri by playerViewModel.lastLoadedSongUri.collectAsState()
 
     // Helper function to get the next track in sorted order (ignoring the pinned track)
     fun getNextTrackInSortOrder(): Song? {
@@ -140,34 +141,39 @@ fun PlayerScreen(
 
     // Restore saved position then start playing — only when the song actually changes
     LaunchedEffect(song, service, connected) {
-        if (connected && service != null) {
-            val alreadyLoaded = lastLoadedSongId == song.id
-            val alreadyPlaying = service!!.isPlaying()
+        try {
+            if (connected && service != null) {
+                val songUri = song.uri?.toString() ?: return@LaunchedEffect
+                val alreadyLoaded = lastLoadedSongUri == songUri
+                val alreadyPlaying = service!!.isPlaying()
 
-            if (alreadyLoaded && alreadyPlaying) {
-                // Navigated back to the same song that is actively playing — do nothing
-                return@LaunchedEffect
+                if (alreadyLoaded && alreadyPlaying) {
+                    // Navigated back to the same song that is actively playing — do nothing
+                    return@LaunchedEffect
+                }
+
+                // Load the new song URI
+                service!!.loadUri(songUri)
+                playerViewModel.setLastLoadedSongUri(songUri)
+
+                // Wait for ExoPlayer to load metadata
+                var attempts = 0
+                while (service!!.getDuration() <= 0 && attempts < 20) {
+                    delay(100)
+                    attempts++
+                }
+
+                val progress = storageManager.getTrackProgress(song.title)
+                if (progress != null && progress.currentTime > 0 && progress.duration > 0) {
+                    // Seek to saved position before playing
+                    service!!.seekTo(progress.currentTime)
+                }
+
+                // Now start playing
+                service!!.play()
             }
-
-            // Load the new song URI
-            service!!.loadUri(song.uri.toString())
-            playerViewModel.setLastLoadedSongId(song.id)
-
-            // Wait for ExoPlayer to load metadata
-            var attempts = 0
-            while (service!!.getDuration() <= 0 && attempts < 20) {
-                delay(100)
-                attempts++
-            }
-
-            val progress = storageManager.getTrackProgress(song.title)
-            if (progress != null && progress.currentTime > 0 && progress.duration > 0) {
-                // Seek to saved position before playing
-                service!!.seekTo(progress.currentTime)
-            }
-
-            // Now start playing
-            service!!.play()
+        } catch (e: Exception) {
+            Log.e("PlayerScreen", "Error loading song: ${e.message}", e)
         }
     }
 

@@ -3,7 +3,8 @@ package com.example.myapp.data
 import android.net.Uri
 
 data class Song(
-    val id: Long,
+    val id: Long,  // WARNING: Unstable ID! Based on list position at scan time.
+                   // TODO(m4): Use stable identifiers like URI hash or file hash instead.
     val title: String,
     val artist: String,
     val uri: Uri,

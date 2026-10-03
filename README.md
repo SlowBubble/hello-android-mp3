@@ -1,5 +1,24 @@
 
 
+# m3b
+- bug fix: app crashes with IllegalArgumentException when clicking different songs
+- root cause: SongListScreen was generating duplicate Compose LazyColumn keys for demarcations
+  - Demarcation objects with same label would have identical keys
+  - Compose requires unique keys for all items in LazyColumn/Row
+  - when song list changed order or was filtered, duplicate keys could appear
+- solution: made demarcation keys unique by including the next song's ID
+  - updated Demarcation data class to include `nextSongId: Long`
+  - changed key from: "demarcation_${item.label}"
+  - changed to: "demarcation_${item.label}_${item.nextSongId}"
+  - this ensures each demarcation is uniquely keyed even with identical labels
+- also: track song by stable URI instead of unstable ID (fixing m2f regression)
+  - changed `lastLoadedSongId` to `lastLoadedSongUri` in PlayerViewModel
+  - Song IDs are unstable (based on scan position), URIs are immutable file paths
+  - fixes: home button now keeps music playing when navigating away
+  - fixes: clicking different songs no longer causes crashes due to ID mismatches
+- added error handling with try-catch and logging in PlayerScreen LaunchedEffect
+  - prevents exceptions from crashing the app, logs errors for debugging
+
 # m3a
 - Add demarcations similar to the html-js impl in the mp3-player folder
     - Also see that impl to use estimated durations so we can sort things and display things by estimated durations instead of file size
