@@ -96,25 +96,37 @@ fun PlayerScreen(
         }
     }
 
-    // Restore saved position then start playing
+    // Track whether this is the first time we've connected for this song
+    var lastLoadedSongId by remember { mutableLongStateOf(-1L) }
+
+    // Restore saved position then start playing — only when the song actually changes
     LaunchedEffect(song, service, connected) {
         if (connected && service != null) {
+            val alreadyLoaded = lastLoadedSongId == song.id
+            val alreadyPlaying = service!!.isPlaying()
+
+            if (alreadyLoaded && alreadyPlaying) {
+                // Navigated back to the same song that is actively playing — do nothing
+                return@LaunchedEffect
+            }
+
             // Load the new song URI
             service!!.loadUri(song.uri.toString())
-            
+            lastLoadedSongId = song.id
+
             // Wait for ExoPlayer to load metadata
             var attempts = 0
             while (service!!.getDuration() <= 0 && attempts < 20) {
                 delay(100)
                 attempts++
             }
-            
+
             val progress = storageManager.getTrackProgress(song.title)
             if (progress != null && progress.currentTime > 0 && progress.duration > 0) {
                 // Seek to saved position before playing
                 service!!.seekTo(progress.currentTime)
             }
-            
+
             // Now start playing
             service!!.play()
         }
@@ -261,11 +273,23 @@ fun PlayerScreen(
                     Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
                 }
 
-                Text(
-                    "Now Playing",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
-                )
+                // Home button spanning the width between speed and X buttons
+                Button(
+                    onClick = {
+                        saveProgress()
+                        onBack()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .padding(horizontal = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.15f)
+                    ),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("🏠", fontSize = 20.sp, color = Color.White)
+                }
 
                 // X button: hide current track and play next
                 Button(

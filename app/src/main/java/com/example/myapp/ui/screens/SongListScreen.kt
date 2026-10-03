@@ -109,49 +109,76 @@ fun SongListScreen(
                             }
                         }
                     } else {
-                        // Home page: Switch button (left) and Sort button (right)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // Home page: two rows of buttons at the top
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Left button - Switch: cycles through previously opened folders
-                            Button(
-                                onClick = { onSwitchButtonClick?.invoke() },
+                            // Row 1: Folder | Hidden
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                ),
-                                enabled = onSwitchButtonClick != null
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    "Switch",
-                                    fontSize = 14.sp,
-                                    color = Color.White
-                                )
+                                Button(
+                                    onClick = { onFolderButtonClick?.invoke() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                    ),
+                                    enabled = onFolderButtonClick != null
+                                ) {
+                                    Text("Folder", fontSize = 14.sp, color = Color.White)
+                                }
+                                Button(
+                                    onClick = { showHidden = !showHidden },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                    )
+                                ) {
+                                    Text("Hidden", fontSize = 14.sp, color = Color.White)
+                                }
                             }
 
-                            // Right button - Sort
-                            Button(
-                                onClick = {
-                                    sortMode = (sortMode + 1) % SortMode.values().size
-                                    storageManager.setSortIndex(sortMode)
-                                },
+                            // Row 2: Switch | Sort
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                )
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(
-                                    SortMode.values()[sortMode].label,
-                                    fontSize = 14.sp,
-                                    color = Color.White
-                                )
+                                Button(
+                                    onClick = { onSwitchButtonClick?.invoke() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                    ),
+                                    enabled = onSwitchButtonClick != null
+                                ) {
+                                    Text("Switch", fontSize = 14.sp, color = Color.White)
+                                }
+                                Button(
+                                    onClick = {
+                                        sortMode = (sortMode + 1) % SortMode.values().size
+                                        storageManager.setSortIndex(sortMode)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                    )
+                                ) {
+                                    Text(SortMode.values()[sortMode].label, fontSize = 14.sp, color = Color.White)
+                                }
                             }
                         }
                     }
@@ -207,52 +234,7 @@ fun SongListScreen(
                     }
                 }
 
-                // Bottom row: Folder button (left of Hidden) - at the bottom of scrollable content
-                if (!showHidden) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Folder button
-                            Button(
-                                onClick = { onFolderButtonClick?.invoke() },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                ),
-                                enabled = onFolderButtonClick != null
-                            ) {
-                                Text(
-                                    "Folder",
-                                    fontSize = 14.sp,
-                                    color = Color.White
-                                )
-                            }
 
-                            // Hidden button
-                            Button(
-                                onClick = { showHidden = !showHidden },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                )
-                            ) {
-                                Text(
-                                    "Hidden",
-                                    fontSize = 14.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }

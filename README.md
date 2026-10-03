@@ -1,5 +1,14 @@
 
-# 
+
+# m2f
+- bug: when I press on an item on the homepage that is already playing, it should be a no-op instead of triggering a seek and play (since there is a few seconds difference, causing a small rewind).
+
+# m2e
+- Let's also add home button to the top of the player page where "Now Playing" (remove this text also) is sitting
+
+# m2d
+- Given that the buttons are no longer sticky, I think it's better to move the folder/hidden button row to the top above the switch/sort button row
+
 # m2c
 - when I select a folder, remember that as 1 of the previously opened folder
 - impl the switch button to cycle thru the previously opened folder and display the tracks

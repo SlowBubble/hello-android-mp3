@@ -251,4 +251,8 @@ class PlayerService : Service() {
         val chapterSize = duration / 10
         return minOf(9, (exoPlayer.currentPosition / chapterSize).toInt())
     }
+
+    fun isPlaying(): Boolean {
+        return exoPlayer.isPlaying
+    }
 }
