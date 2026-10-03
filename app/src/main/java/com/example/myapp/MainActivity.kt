@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
+import androidx.media3.common.util.UnstableApi
 import com.example.myapp.data.SongScanner
 import com.example.myapp.service.PlayerService
 import com.example.myapp.ui.screens.FilePickerScreen
@@ -25,6 +26,7 @@ import com.example.myapp.ui.screens.PlayerScreen
 import com.example.myapp.ui.theme.MyAppTheme
 import com.example.myapp.viewmodel.PlayerViewModel
 
+@OptIn(UnstableApi::class)
 @Composable
 fun NavigationHost(
     context: android.content.Context,

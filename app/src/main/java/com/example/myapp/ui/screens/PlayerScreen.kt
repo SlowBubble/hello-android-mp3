@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,6 +27,7 @@ import com.example.myapp.data.StorageManager
 import com.example.myapp.service.PlayerService
 import kotlinx.coroutines.delay
 
+@OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
     song: Song,
@@ -54,6 +57,9 @@ fun PlayerScreen(
     
     // Collect lastLoadedSongUri from ViewModel to track across navigation
     val lastLoadedSongUri by playerViewModel.lastLoadedSongUri.collectAsState()
+
+    // State to track if we've already handled this track ending
+    var trackEndedHandled by remember { mutableStateOf(false) }
 
     // Helper function to get the next track in sorted order (ignoring the pinned track)
     fun getNextTrackInSortOrder(): Song? {
@@ -114,7 +120,38 @@ fun PlayerScreen(
                 if (binder is PlayerService.LocalBinder) {
                     service = binder.getService()
                     connected = true
-                    // Don't load here — let LaunchedEffect handle it
+                    
+                    // Add listener for track end detection
+                    service?.exoPlayer?.addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (playbackState == Player.STATE_ENDED) {
+                                // Track finished naturally
+                                if (!trackEndedHandled) {
+                                    trackEndedHandled = true
+                                    try {
+                                        // Save progress
+                                        saveProgress()
+                                        
+                                        // Hide current track
+                                        storageManager.hideTrack(song.title)
+                                        
+                                        // Find next track in sorted order
+                                        val nextSong = getNextTrackInSortOrder()
+                                        
+                                        if (nextSong != null) {
+                                            onTrackHideAndNext(nextSong)
+                                        } else {
+                                            // No more non-hidden tracks, go back to home
+                                            onBack()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("PlayerScreen", "Error auto-advancing to next track: ${e.message}", e)
+                                        onBack()
+                                    }
+                                }
+                            }
+                        }
+                    })
                 }
             }
 
@@ -144,6 +181,8 @@ fun PlayerScreen(
     LaunchedEffect(song, service, connected) {
         try {
             if (connected && service != null) {
+                trackEndedHandled = false  // Reset flag for new song
+                
                 val songUri = song.uri?.toString() ?: return@LaunchedEffect
                 val alreadyLoaded = lastLoadedSongUri == songUri
                 val alreadyPlaying = service!!.isPlaying()
@@ -153,7 +192,7 @@ fun PlayerScreen(
                     return@LaunchedEffect
                 }
 
-                // Load the new song URI
+                // Load the new song URI (this calls stop() internally)
                 service!!.loadUri(songUri)
                 playerViewModel.setLastLoadedSongUri(songUri)
 
@@ -206,28 +245,7 @@ fun PlayerScreen(
         }
     }
 
-    // Auto-hide on completion
-    LaunchedEffect(currentPosition, duration) {
-        if (duration > 0 && duration - currentPosition < 30000 && duration - currentPosition > 29000) {
-            try {
-                // Track is finishing, hide it and play next
-                storageManager.hideTrack(song.title)
-                
-                // Find next track in sorted order
-                val nextSong = getNextTrackInSortOrder()
-                
-                if (nextSong != null) {
-                    onTrackHideAndNext(nextSong)
-                } else {
-                    // No more non-hidden tracks, go back to home
-                    onBack()
-                }
-            } catch (e: Exception) {
-                Log.e("PlayerScreen", "Error auto-advancing to next track: ${e.message}", e)
-                onBack()
-            }
-        }
-    }
+
 
     // Save when screen is disposed (user navigates away)
     DisposableEffect(Unit) {

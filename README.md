@@ -1,4 +1,59 @@
 
+# m4b ✓ - Track Playback Bug Fixes
+
+Fixed critical bugs where tracks would overlap during auto-advance to the next track.
+
+## Issues Fixed
+
+### Bug #1: Missing Stop Command During Track Transitions
+- **Problem**: When loading a new track, the old track's playback continued in ExoPlayer buffer
+- **Result**: Both tracks played simultaneously for a moment
+- **Fix**: Added `exoPlayer.stop()` to `PlayerService.loadUri()` to completely stop the previous track before loading new media
+
+### Bug #2: Time-Based Auto-Advance Race Condition
+- **Problem**: 30-second completion window was fragile and fired multiple times per second when approaching track end
+- **Result**: LaunchedEffect would trigger multiple times, causing state race conditions
+- **Fix**: Removed the 1-second detection window (`29000 < diff < 30000`) and replaced with event-driven detection
+
+### Bug #3: Event-Based Track Completion Detection
+- **Solution**: Added ExoPlayer's `Player.Listener` to detect `STATE_ENDED` event
+- **Benefit**: Only triggers once when track actually finishes, not based on imprecise timing
+- **Implementation**: Listener added in `PlayerScreen` when service connects
+
+### Bug #4: State Management for Auto-Advance
+- **Problem**: Without proper flag management, the listener could trigger multiple times
+- **Solution**: Added `trackEndedHandled` flag that resets when a new song is loaded
+
+## Changes Made
+
+### PlayerService.kt
+```kotlin
+fun loadUri(uri: String) {
+    // ... create mediaItem ...
+    exoPlayer.stop()  // Stop previous playback
+    exoPlayer.setMediaItem(mediaItem)
+    exoPlayer.prepare()
+}
+
+fun stop() {
+    exoPlayer.stop()
+}
+```
+
+### PlayerScreen.kt
+- Removed: 30-second auto-hide LaunchedEffect with time-based detection
+- Added: `Player.Listener` in service connection to detect `STATE_ENDED`
+- Added: `trackEndedHandled` state flag that resets per song
+- When track ends naturally, auto-hide and advance to next non-hidden track
+- Added `@OptIn(UnstableApi::class)` annotation for ExoPlayer API
+
+## Result
+✅ Tracks now advance only when they actually finish
+✅ No more overlapping audio from simultaneous playback
+✅ Clean, event-driven detection instead of fragile time-based window
+✅ Proper state cleanup between track transitions
+
+---
 
 # m4a
 - milestone: replace all unstable Song ID usage with stable URI-based identification

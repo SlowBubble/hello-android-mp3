@@ -170,9 +170,14 @@ class PlayerService : Service() {
                     .build()
             )
             .build()
+        exoPlayer.stop()
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         // Don't call play() - just prepare for playback
+    }
+
+    fun stop() {
+        exoPlayer.stop()
     }
 
     fun pause() {
