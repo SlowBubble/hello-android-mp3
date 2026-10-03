@@ -51,6 +51,11 @@ class PlayerViewModel : ViewModel() {
         _isPlaying.value = true
     }
 
+    fun clearCurrentSong() {
+        _currentSong.value = null
+        _isPlaying.value = false
+    }
+
     fun setIsPlaying(playing: Boolean) {
         _isPlaying.value = playing
     }

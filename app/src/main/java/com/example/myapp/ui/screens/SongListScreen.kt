@@ -31,6 +31,7 @@ fun SongListScreen(
     currentSongId: Long? = null,
     onSongClick: (Song) -> Unit,
     onFolderButtonClick: (() -> Unit)? = null,
+    onSwitchButtonClick: (() -> Unit)? = null,
     onSongDeleted: ((Song) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -115,15 +116,16 @@ fun SongListScreen(
                                 .height(48.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Left button - Switch (no-op for now)
+                            // Left button - Switch: cycles through previously opened folders
                             Button(
-                                onClick = { /* no-op for now */ },
+                                onClick = { onSwitchButtonClick?.invoke() },
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight(),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                )
+                                ),
+                                enabled = onSwitchButtonClick != null
                             ) {
                                 Text(
                                     "Switch",

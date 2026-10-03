@@ -23,6 +23,9 @@ class StorageManager(private val context: Context) {
         private const val KEY_SORT_INDEX = "sort_index"
         private const val KEY_LAST_ACTIVE_TRACK = "last_active_track"
         private const val KEY_FOLDER_URI = "folder_uri"
+        private const val KEY_FOLDER_HISTORY = "folder_history"
+        private const val KEY_CURRENT_FOLDER_INDEX = "current_folder_index"
+        private const val MAX_FOLDER_HISTORY = 10
     }
 
     // ============== Track Progress ==============
@@ -118,6 +121,62 @@ class StorageManager(private val context: Context) {
 
     fun getFolderUri(): String? {
         return prefs.getString(KEY_FOLDER_URI, null)
+    }
+
+    // ============== Folder History ==============
+
+    /**
+     * Returns the ordered list of previously opened folder URIs (most recent first).
+     */
+    fun getFolderHistory(): List<String> {
+        return try {
+            val stored = prefs.getString(KEY_FOLDER_HISTORY, "[]") ?: "[]"
+            Json.decodeFromString<List<String>>(stored)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /**
+     * Adds a folder URI to the front of the history list (deduplicating and capping at MAX).
+     * Also resets the current folder index to 0 (the newly added folder is now "current").
+     */
+    fun addFolderToHistory(folderUri: String) {
+        val history = getFolderHistory().toMutableList()
+        history.remove(folderUri)          // remove duplicate if present
+        history.add(0, folderUri)          // prepend as most recent
+        if (history.size > MAX_FOLDER_HISTORY) history.removeAt(history.size - 1)
+        try {
+            val stored = json.encodeToString(history)
+            prefs.edit()
+                .putString(KEY_FOLDER_HISTORY, stored)
+                .putInt(KEY_CURRENT_FOLDER_INDEX, 0)
+                .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getCurrentFolderIndex(): Int {
+        return prefs.getInt(KEY_CURRENT_FOLDER_INDEX, 0)
+    }
+
+    fun setCurrentFolderIndex(index: Int) {
+        prefs.edit().putInt(KEY_CURRENT_FOLDER_INDEX, index).apply()
+    }
+
+    /**
+     * Returns the URI for the currently selected folder (by index into history),
+     * falling back to the legacy single folder_uri key for backwards compatibility.
+     */
+    fun getCurrentFolderUri(): String? {
+        val history = getFolderHistory()
+        if (history.isNotEmpty()) {
+            val idx = getCurrentFolderIndex().coerceIn(0, history.size - 1)
+            return history[idx]
+        }
+        return getFolderUri()
     }
 
     // ============== Playback Statistics ==============

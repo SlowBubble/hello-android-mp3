@@ -56,9 +56,10 @@ fun NavigationHost(
                 if (found.isNotEmpty()) {
                     playerViewModel.setSongs(found)
                     
-                    // Save folder URI
+                    // Save folder URI and add to history
                     val storageManager = com.example.myapp.data.StorageManager(context)
                     storageManager.setFolderUri(it.toString())
+                    storageManager.addFolderToHistory(it.toString())
                     
                     // Restore last active track if it exists
                     val lastActiveTrackName = storageManager.getLastActiveTrack()
@@ -86,7 +87,7 @@ fun NavigationHost(
         if (!hasAutoLoaded) {
             hasAutoLoaded = true
             val storageManager = com.example.myapp.data.StorageManager(context)
-            val savedFolder = storageManager.getFolderUri()
+            val savedFolder = storageManager.getCurrentFolderUri()
             
             if (savedFolder != null) {
                 try {
@@ -156,6 +157,32 @@ fun NavigationHost(
                 onFolderButtonClick = {
                     // Launch folder picker directly
                     folderPickerLauncher.launch(null)
+                },
+                onSwitchButtonClick = {
+                    // Cycle to the next folder in history and load its tracks
+                    val storageManager = com.example.myapp.data.StorageManager(context)
+                    val history = storageManager.getFolderHistory()
+                    if (history.size > 1) {
+                        val currentIdx = storageManager.getCurrentFolderIndex()
+                        val nextIdx = (currentIdx + 1) % history.size
+                        val nextFolderUri = history[nextIdx]
+                        try {
+                            val scanner = SongScanner(context)
+                            val found = scanner.scanFolderForMp3s(nextFolderUri)
+                            if (found.isNotEmpty()) {
+                                storageManager.setCurrentFolderIndex(nextIdx)
+                                playerViewModel.setSongs(found)
+                                // Clear current song so no stale track from old folder is pinned
+                                playerViewModel.clearCurrentSong()
+                            } else {
+                                Toast.makeText(context, "No MP3 files found in that folder", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Switch folder error", e)
+                            Toast.makeText(context, "Error loading folder: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    // Only 1 (or 0) folders in history — do nothing
                 },
                 onSongDeleted = { deletedSong ->
                     // Remove deleted song from the list
