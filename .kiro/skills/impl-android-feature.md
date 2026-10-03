@@ -1,0 +1,1 @@
+Read README.md for implementation request and always run ./gradlew installDebug after implementing

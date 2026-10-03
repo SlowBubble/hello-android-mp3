@@ -1,1 +1,0 @@
-/Users/kris/code/hello-android/.agents/system_prompt.md
