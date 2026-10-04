@@ -1,8 +1,12 @@
 
-# m4e
+# m4f
 - For the switch button in the home page:
   - Let's display the folder name; not the full path, just the name (do we need to store it to be available)?
   - Let's add one more, calling it "All" that opens the tracks for all the folders combined (is that possible)
+
+# m4e
+- When the items are first loaded to display in the home page or hidden page (not sure when that happens), if the item's current time is less than 25 seconds away from the end (based on the estimated duration), can you reset the item's current time to 0.
+- When I press on an item in the hidden page to play it, can you automatically to "unhide" it, so that it shows up in the home page instead of hidden
 
 # m4d ✓ - Auto-Advance Track Completion Crash Fix
 

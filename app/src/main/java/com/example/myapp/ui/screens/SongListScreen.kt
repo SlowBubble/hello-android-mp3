@@ -168,8 +168,21 @@ fun SongListScreen(
         filtered
     }
 
+    // M4e: Auto-reset tracks that are within 25 seconds of the end
     val visibleSongs = remember(sortedAndFiltered, visibleCount) {
-        sortedAndFiltered.take(visibleCount)
+        val songs = sortedAndFiltered.take(visibleCount)
+        songs.forEach { song ->
+            val progress = storageManager.getTrackProgress(song.title)
+            if (progress != null && progress.duration > 0 && progress.currentTime > 0) {
+                val timeToEnd = progress.duration - progress.currentTime
+                // If within 25 seconds of the end, reset current time to 0
+                if (timeToEnd < 25000) { // 25 seconds in milliseconds
+                    val resetProgress = progress.copy(currentTime = 0)
+                    storageManager.saveTrackProgress(song.title, resetProgress)
+                }
+            }
+        }
+        songs
     }
 
     val hasMore = sortedAndFiltered.size > visibleCount
@@ -359,7 +372,14 @@ fun SongListScreen(
                                 progress = storageManager.getTrackProgress(song.title),
                                 maxFileSize = songs.maxOf { it.fileSize },
                                 isHidden = hiddenTracks.contains(song.title),
-                                onSongClick = { onSongClick(song) },
+                                onSongClick = { 
+                                    // M4e: Auto-unhide if playing from hidden page
+                                    if (showHidden) {
+                                        storageManager.unhideTrack(song.title)
+                                        hiddenTracksRefresh++
+                                    }
+                                    onSongClick(song) 
+                                },
                                 onHideClick = {
                                     storageManager.hideTrack(song.title)
                                     hiddenTracksRefresh++
