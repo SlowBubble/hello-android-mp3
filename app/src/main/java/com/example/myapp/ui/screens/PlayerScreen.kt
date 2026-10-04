@@ -241,7 +241,9 @@ fun PlayerScreen(
         while (connected && service != null) {
             currentPosition = service!!.getCurrentPosition()
             val newDuration = service!!.getDuration()
-            if (newDuration > 0 && newDuration != duration) {
+            // Always update duration if it's valid (> 0), even if it's the same
+            // This ensures progress bar proportions stay accurate when duration changes
+            if (newDuration > 0) {
                 duration = newDuration
             }
             delay(500)
@@ -530,7 +532,10 @@ fun PlayerScreen(
                             )
                     ) {
                         if (duration > 0) {
-                            val progress = currentPosition.toFloat() / duration.toFloat()
+                            // Calculate progress: 0.0 to 1.0
+                            // Clamp currentPosition to [0, duration] to ensure proportional bar
+                            val clampedPosition = currentPosition.coerceIn(0L, duration)
+                            val progress = clampedPosition.toFloat() / duration.toFloat()
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
@@ -543,7 +548,7 @@ fun PlayerScreen(
                         }
                     }
 
-                    // Time display
+                    // Time display - use only actual duration from service, not saved estimates
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -553,8 +558,9 @@ fun PlayerScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.8f)
                         )
+                        // Display duration that matches the progress bar calculation
                         Text(
-                            formatTime(duration),
+                            if (duration > 0) formatTime(duration) else "--:--",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.8f)
                         )

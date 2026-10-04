@@ -20,11 +20,11 @@ import com.example.myapp.data.StorageManager
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class SortMode(val label: String) {
-    SHORTEST("Sort (Small)"),
-    LONGEST("Sort (Big)"),
-    NEWEST("Sort (Fresh)"),
-    OLDEST("Sort (Stale)")
+enum class SortMode(val label: String, val symbol: String) {
+    SHORTEST("Sort", "📏"),
+    LONGEST("Sort", "📏📏📏"),
+    NEWEST("Sort", "⏳"),
+    OLDEST("Sort", "⏳⏳⏳")
 }
 
 // Sealed class for list items (song or demarcation)
@@ -303,7 +303,11 @@ fun SongListScreen(
                                         containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
                                     )
                                 ) {
-                                    Text(SortMode.values()[sortMode].label, fontSize = 14.sp, color = Color.White)
+                                    Text(
+                                        "${SortMode.values()[sortMode].label} | ${SortMode.values()[sortMode].symbol}",
+                                        fontSize = 14.sp,
+                                        color = Color.White
+                                    )
                                 }
                             }
                         }
@@ -364,9 +368,10 @@ fun SongListScreen(
                     when (item) {
                         is SongListItem.SongItem -> {
                             val song = item.song
-                            // Calculate max duration across all visible songs (using estimated duration)
+                            // Calculate max duration across all visible songs using actual saved durations
                             val maxDurationMs = visibleSongs.maxOfOrNull { s ->
-                                estimateDuration(s.fileSize)
+                                storageManager.getTrackProgress(s.title)?.duration?.takeIf { it > 0 }
+                                    ?: estimateDuration(s.fileSize)
                             } ?: 1L
                             
                             SongListItemComposable(
@@ -504,7 +509,9 @@ fun SongListItemComposable(
                     .fillMaxWidth()
                     .height(6.dp)
             ) {
-                val trackDuration = estimateDuration(song.fileSize)
+                // Use actual saved duration if available, otherwise estimate
+                val trackDuration = progress?.duration?.takeIf { it > 0 } 
+                    ?: estimateDuration(song.fileSize)
                 
                 if (maxDuration > 0 && trackDuration > 0) {
                     val grayWidth = (trackDuration.toFloat() / maxDuration.toFloat()) * 100

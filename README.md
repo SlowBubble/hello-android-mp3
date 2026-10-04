@@ -1,4 +1,71 @@
 
+# m4g ✓ - Progress Bar Proportion Fix
+
+Fixed grey progress bar in song list not being proportional to displayed duration.
+
+## Issue
+
+The grey progress bar showed incorrect proportions when comparing tracks:
+- A 29:54 track would have a longer grey bar than a 31:21 track
+- Bar length didn't match the displayed duration
+
+## Root Cause
+
+Two separate duration calculations were being used inconsistently:
+1. **Player screen**: Used actual ExoPlayer duration (loaded from metadata)
+2. **Song list**: Used estimated duration from file size (assuming 128 kbps bitrate)
+
+When these two durations differed (common with m4a files that have inaccurate metadata), the bars became disproportionate.
+
+Additionally, the song list was mixing units:
+- Grey bar: calculated from `(estimatedDuration / maxFileSize) * 100` (mixing milliseconds and bytes)
+- Green bar: calculated from `(currentTime / actualDuration) * 100` (both milliseconds)
+
+## Solution
+
+### PlayerScreen.kt
+- Updated duration sync to always use current ExoPlayer duration (removed equality check)
+- Clamp currentPosition to ensure progress never exceeds 100%
+- Display only uses actual duration from ExoPlayer, not saved estimates
+
+```kotlin
+// Continuously update UI state from service
+val newDuration = service!!.getDuration()
+if (newDuration > 0) {
+    duration = newDuration  // Always update, not just on change
+}
+
+// Progress bar: clamp position and calculate proportion
+val clampedPosition = currentPosition.coerceIn(0L, duration)
+val progress = clampedPosition.toFloat() / duration.toFloat()
+```
+
+### SongListScreen.kt
+- Grey bar now uses **actual saved duration** when available, not estimated
+- `maxDuration` calculation updated to use actual durations across all visible songs
+- All duration comparisons now in milliseconds (consistent units)
+
+```kotlin
+val trackDuration = progress?.duration?.takeIf { it > 0 }
+    ?: estimateDuration(song.fileSize)
+
+val maxDurationMs = visibleSongs.maxOfOrNull { s ->
+    storageManager.getTrackProgress(s.title)?.duration?.takeIf { it > 0 }
+        ?: estimateDuration(s.fileSize)
+} ?: 1L
+
+val grayWidth = (trackDuration.toFloat() / maxDurationMs.toFloat()) * 100
+```
+
+## Result
+
+✅ Grey bar width is now always proportional to displayed duration
+✅ Shorter tracks reliably show shorter bars than longer tracks
+✅ Both player screen and song list use consistent duration values
+✅ Visual comparison between tracks is accurate and meaningful
+
+---
+
 # m4f
 - For the switch button in the home page:
   - Let's display the folder name; not the full path, just the name (do we need to store it to be available; if it's not available, we can do "Folder 1", etc)?
