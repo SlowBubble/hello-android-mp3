@@ -71,4 +71,32 @@ class SongScanner(private val context: Context) {
         Log.d("SongScanner", "Total MP3 files found: ${result.size}")
         return result
     }
+
+    /**
+     * Scan multiple folders and return combined list of all MP3s found.
+     * Deduplicates by URI to avoid showing the same file twice if it appears in multiple folders.
+     */
+    fun scanMultipleFoldersForMp3s(folderUris: List<String>): List<Song> {
+        val allSongs = mutableListOf<Song>()
+        val seenUris = mutableSetOf<String>()
+
+        for (folderUri in folderUris) {
+            try {
+                val songs = scanFolderForMp3s(folderUri)
+                for (song in songs) {
+                    val uriString = song.uri.toString()
+                    if (!seenUris.contains(uriString)) {
+                        allSongs.add(song)
+                        seenUris.add(uriString)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("SongScanner", "Error scanning folder $folderUri: ${e.message}", e)
+                // Continue scanning other folders even if one fails
+            }
+        }
+
+        Log.d("SongScanner", "Total MP3 files found across all folders: ${allSongs.size}")
+        return allSongs
+    }
 }

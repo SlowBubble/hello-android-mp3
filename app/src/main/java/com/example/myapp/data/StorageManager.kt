@@ -25,6 +25,7 @@ class StorageManager(private val context: Context) {
         private const val KEY_FOLDER_URI = "folder_uri"
         private const val KEY_FOLDER_HISTORY = "folder_history"
         private const val KEY_CURRENT_FOLDER_INDEX = "current_folder_index"
+        private const val KEY_SHOW_ALL_FOLDERS = "show_all_folders"
         private const val MAX_FOLDER_HISTORY = 10
     }
 
@@ -177,6 +178,76 @@ class StorageManager(private val context: Context) {
             return history[idx]
         }
         return getFolderUri()
+    }
+
+    /**
+     * Extract folder name from a URI path.
+     * For example: "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FPlaylists"
+     * might return "Playlists"
+     */
+    private fun extractFolderName(uri: String): String? {
+        return try {
+            // Decode the entire URI string first to handle encoded segments
+            val decoded = java.net.URLDecoder.decode(uri, "UTF-8")
+            
+            // Look for the tree document ID which contains the folder structure
+            // Format: primary:Music/Playlists or similar
+            val treeDocIdPattern = "tree/([^/]+)".toRegex()
+            val match = treeDocIdPattern.find(decoded)
+            
+            if (match != null) {
+                val treeDocId = match.groupValues[1]
+                // Split by colon to remove "primary:" prefix
+                val parts = treeDocId.split(":")
+                val pathPart = if (parts.size > 1) parts[1] else treeDocId
+                
+                // Get the last folder name from the path
+                val folderParts = pathPart.split("/")
+                val lastFolder = folderParts.lastOrNull { it.isNotEmpty() }
+                lastFolder?.takeIf { it.isNotEmpty() }
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Get display name for a folder URI.
+     * Returns either the extracted folder name or a generic "Folder N" label.
+     */
+    fun getFolderDisplayName(uri: String, index: Int): String {
+        val extracted = extractFolderName(uri)
+        return if (!extracted.isNullOrEmpty()) {
+            extracted
+        } else {
+            "Folder ${index + 1}"
+        }
+    }
+
+    /**
+     * Get the display name of the current folder.
+     */
+    fun getCurrentFolderDisplayName(): String {
+        val history = getFolderHistory()
+        if (history.isNotEmpty()) {
+            val idx = getCurrentFolderIndex().coerceIn(0, history.size - 1)
+            return getFolderDisplayName(history[idx], idx)
+        }
+        return "Folder"
+    }
+
+    /**
+     * Enable/disable "All Folders" mode (shows tracks from all folders combined).
+     */
+    fun setShowAllFolders(showAll: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_ALL_FOLDERS, showAll).apply()
+    }
+
+    /**
+     * Check if "All Folders" mode is enabled.
+     */
+    fun isShowAllFolders(): Boolean {
+        return prefs.getBoolean(KEY_SHOW_ALL_FOLDERS, false)
     }
 
     // ============== Playback Statistics ==============

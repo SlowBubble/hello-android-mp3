@@ -139,6 +139,10 @@ fun NavigationHost(
         }
 
         composable("songList") {
+            val storageManager = remember { com.example.myapp.data.StorageManager(context) }
+            val folderDisplayName = remember(songs) { storageManager.getCurrentFolderDisplayName() }
+            val isShowingAllFolders = remember(songs) { storageManager.isShowAllFolders() }
+            
             SongListScreen(
                 songs = songs,
                 currentSongId = currentSong?.id,
@@ -157,23 +161,49 @@ fun NavigationHost(
                     folderPickerLauncher.launch(null)
                 },
                 onSwitchButtonClick = {
-                    // Cycle to the next folder in history and load its tracks
+                    // Cycle to the next folder (or "All") in history and load its tracks
                     val storageManager = com.example.myapp.data.StorageManager(context)
                     val history = storageManager.getFolderHistory()
+                    
                     if (history.size > 1) {
                         val currentIdx = storageManager.getCurrentFolderIndex()
-                        val nextIdx = (currentIdx + 1) % history.size
-                        val nextFolderUri = history[nextIdx]
+                        val isCurrentlyShowingAll = storageManager.isShowAllFolders()
+                        
+                        // Determine next index
+                        val nextIdx = if (isCurrentlyShowingAll) {
+                            // Currently showing all, go back to first folder
+                            storageManager.setShowAllFolders(false)
+                            0
+                        } else {
+                            // Not showing all, check if next would be past the end
+                            val tentativeIdx = (currentIdx + 1) % history.size
+                            if (tentativeIdx == 0) {
+                                // We've wrapped around, show "All" instead
+                                storageManager.setShowAllFolders(true)
+                                currentIdx // Keep same index internally, but show all
+                            } else {
+                                tentativeIdx
+                            }
+                        }
+                        
                         try {
                             val scanner = SongScanner(context)
-                            val found = scanner.scanFolderForMp3s(nextFolderUri)
-                            if (found.isNotEmpty()) {
+                            val found = if (storageManager.isShowAllFolders()) {
+                                // Scan all folders and combine
+                                scanner.scanMultipleFoldersForMp3s(history)
+                            } else {
+                                // Scan just the next folder
+                                val nextFolderUri = history[nextIdx]
                                 storageManager.setCurrentFolderIndex(nextIdx)
+                                scanner.scanFolderForMp3s(nextFolderUri)
+                            }
+                            
+                            if (found.isNotEmpty()) {
                                 playerViewModel.setSongs(found)
                                 // Clear current song so no stale track from old folder is pinned
                                 playerViewModel.clearCurrentSong()
                             } else {
-                                Toast.makeText(context, "No MP3 files found in that folder", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "No MP3 files found", Toast.LENGTH_SHORT).show()
                             }
                         } catch (e: Exception) {
                             Log.e("MainActivity", "Switch folder error", e)
@@ -186,7 +216,9 @@ fun NavigationHost(
                     // Remove deleted song from the list (by URI for stability)
                     val updatedSongs = songs.filter { it.uri != deletedSong.uri }
                     playerViewModel.setSongs(updatedSongs)
-                }
+                },
+                folderDisplayName = folderDisplayName,
+                isShowingAllFolders = isShowingAllFolders
             )
         }
 

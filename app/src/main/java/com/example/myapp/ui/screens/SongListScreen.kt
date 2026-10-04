@@ -143,6 +143,8 @@ fun SongListScreen(
     onFolderButtonClick: (() -> Unit)? = null,
     onSwitchButtonClick: (() -> Unit)? = null,
     onSongDeleted: ((Song) -> Unit)? = null,
+    folderDisplayName: String = "Switch",
+    isShowingAllFolders: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -286,7 +288,8 @@ fun SongListScreen(
                                     ),
                                     enabled = onSwitchButtonClick != null
                                 ) {
-                                    Text("Switch", fontSize = 14.sp, color = Color.White)
+                                    val label = if (isShowingAllFolders) "All" else folderDisplayName
+                                    Text(label, fontSize = 14.sp, color = Color.White)
                                 }
                                 Button(
                                     onClick = {
