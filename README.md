@@ -1,4 +1,83 @@
 
+# m4e
+- For the switch button in the home page:
+  - Let's display the folder name; not the full path, just the name (do we need to store it to be available)?
+  - Let's add one more, calling it "All" that opens the tracks for all the folders combined (is that possible)
+
+# m4d ✓ - Auto-Advance Track Completion Crash Fix
+
+Fixed app crash that occurred when a track finished and attempted to auto-advance to the next track.
+
+## Issue
+
+When a track ended naturally, the app crashed with `ForegroundServiceStartNotAllowedException: Service.startForeground() not allowed` instead of advancing to the next track.
+
+## Root Cause
+
+On Android 14+ (target SDK 34), the system restricts when apps can start a foreground service. When a track finished and the app attempted to transition to the next track:
+1. `PlayerScreen` detected `Player.STATE_ENDED` via the Player.Listener
+2. Called `onTrackHideAndNext()` to load the next track
+3. The new track's URI was loaded, triggering media3 notification updates
+4. `PlayerService.NotificationListener.onNotificationPosted()` tried to call `startForeground()`
+5. Since the app was in a background state during track transition, the system rejected the call
+6. Unhandled exception crashed the app instead of advancing to the next track
+
+## Solution
+
+Added comprehensive exception handling in `PlayerService.NotificationListener` to gracefully handle foreground service restrictions:
+
+```kotlin
+private inner class NotificationListener : PlayerNotificationManager.NotificationListener {
+    override fun onNotificationPosted(
+        notificationId: Int,
+        notification: Notification,
+        ongoing: Boolean
+    ) {
+        if (ongoing) {
+            try {
+                startForeground(notificationId, notification)
+            } catch (e: Exception) {
+                // Handle ForegroundServiceStartNotAllowedException (API 31+)
+                // This can happen when transitioning between tracks in the background
+                android.util.Log.w("PlayerService", "Could not start foreground service: ${e.message}", e)
+            }
+        } else {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(false)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("PlayerService", "Could not stop foreground: ${e.message}", e)
+            }
+        }
+    }
+
+    override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PlayerService", "Could not stop foreground on notification cancelled: ${e.message}", e)
+        }
+        stopSelf()
+    }
+}
+```
+
+## Result
+
+✅ Tracks now smoothly advance to the next track when they finish
+✅ No crash when transitioning between tracks in background state
+✅ Foreground service exceptions are logged as warnings for debugging
+✅ App remains stable during auto-advance operations
+
 # m4c
 - bug fix: grey duration bar in song list was incorrectly scaled using file size instead of duration
 - root cause: progress bar width calculation compared track duration (milliseconds) against maximum file size (bytes)

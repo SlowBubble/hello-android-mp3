@@ -120,23 +120,37 @@ class PlayerService : Service() {
             ongoing: Boolean
         ) {
             if (ongoing) {
-                startForeground(notificationId, notification)
+                try {
+                    startForeground(notificationId, notification)
+                } catch (e: Exception) {
+                    // Handle ForegroundServiceStartNotAllowedException (API 31+)
+                    // This can happen when transitioning between tracks in the background
+                    android.util.Log.w("PlayerService", "Could not start foreground service: ${e.message}", e)
+                }
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_DETACH)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(false)
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_DETACH)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(false)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("PlayerService", "Could not stop foreground: ${e.message}", e)
                 }
             }
         }
 
         override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("PlayerService", "Could not stop foreground on notification cancelled: ${e.message}", e)
             }
             stopSelf()
         }

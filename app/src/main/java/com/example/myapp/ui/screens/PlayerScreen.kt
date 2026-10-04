@@ -60,6 +60,7 @@ fun PlayerScreen(
 
     // State to track if we've already handled this track ending
     var trackEndedHandled by remember { mutableStateOf(false) }
+    var currentPlayerListener by remember { mutableStateOf<Player.Listener?>(null) }
 
     // Helper function to get the next track in sorted order (ignoring the pinned track)
     fun getNextTrackInSortOrder(): Song? {
@@ -114,21 +115,33 @@ fun PlayerScreen(
         }
     }
 
-    val connection = remember(context) {
+    val connection = remember(context, song) {
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 if (binder is PlayerService.LocalBinder) {
                     service = binder.getService()
                     connected = true
                     
+                    // Remove any previous listener before adding a new one
+                    if (currentPlayerListener != null) {
+                        try {
+                            service?.exoPlayer?.removeListener(currentPlayerListener!!)
+                            Log.d("PlayerScreen", "Removed old player listener")
+                        } catch (e: Exception) {
+                            Log.w("PlayerScreen", "Error removing old listener: ${e.message}")
+                        }
+                    }
+                    
                     // Add listener for track end detection
-                    service?.exoPlayer?.addListener(object : Player.Listener {
+                    val listener = object : Player.Listener {
                         override fun onPlaybackStateChanged(playbackState: Int) {
+                            Log.d("PlayerScreen", "Playback state changed: $playbackState for song: ${song.title}")
                             if (playbackState == Player.STATE_ENDED) {
                                 // Track finished naturally
                                 if (!trackEndedHandled) {
                                     trackEndedHandled = true
                                     try {
+                                        Log.d("PlayerScreen", "Track ended: ${song.title}")
                                         // Save progress
                                         saveProgress()
                                         
@@ -139,9 +152,11 @@ fun PlayerScreen(
                                         val nextSong = getNextTrackInSortOrder()
                                         
                                         if (nextSong != null) {
+                                            Log.d("PlayerScreen", "Advancing to next track: ${nextSong.title}")
                                             onTrackHideAndNext(nextSong)
                                         } else {
                                             // No more non-hidden tracks, go back to home
+                                            Log.d("PlayerScreen", "No more tracks available, going back")
                                             onBack()
                                         }
                                     } catch (e: Exception) {
@@ -151,7 +166,11 @@ fun PlayerScreen(
                                 }
                             }
                         }
-                    })
+                    }
+                    
+                    currentPlayerListener = listener
+                    service?.exoPlayer?.addListener(listener)
+                    Log.d("PlayerScreen", "Added player listener for song: ${song.title}")
                 }
             }
 
