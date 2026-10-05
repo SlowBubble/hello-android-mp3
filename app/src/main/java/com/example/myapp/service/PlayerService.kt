@@ -87,8 +87,10 @@ class PlayerService : Service() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        android.util.Log.d("PlayerService", "onUnbind called with intent=$intent")
-        return true // allow onRebind
+        android.util.Log.d("PlayerService", "onUnbind called with intent=$intent, isPlaying=${exoPlayer.isPlaying}")
+        // Return true to receive onRebind call when client binds again
+        // The service will continue playing music in the background via the notification
+        return true
     }
 
     override fun onRebind(intent: Intent?) {
@@ -166,6 +168,16 @@ class PlayerService : Service() {
 
         override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
             android.util.Log.d("PlayerService", "onNotificationCancelled: id=$notificationId dismissedByUser=$dismissedByUser")
+            
+            // If player is still playing, keep the service alive - don't stop foreground
+            if (exoPlayer.isPlaying) {
+                android.util.Log.d("PlayerService", "Player still playing, keeping service alive without foreground")
+                // Don't call stopForeground or stopSelf - let the service continue
+                // The notification will be reposted by playerNotificationManager when needed
+                return
+            }
+            
+            // If player is not playing, stop the foreground service
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     stopForeground(STOP_FOREGROUND_REMOVE)

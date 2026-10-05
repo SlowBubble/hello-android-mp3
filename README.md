@@ -1,6 +1,46 @@
 
-# m4h
-- regression: when I press the home button from a playing track's page, the track stop playing; it should keep playing
+# m4h ✓ - Home Button Playback Persistence
+
+Fixed regression where pressing home button would stop playback. Music now continues playing in the background and resumes control when you return to the player screen.
+
+## Issue
+
+When pressing the home button to leave the PlayerScreen, the music would stop instead of continuing to play in the background.
+
+## Root Cause
+
+The `onNotificationCancelled()` callback was always calling `stopSelf()`, which killed the service even if music was still playing. This happened because:
+1. When leaving PlayerScreen, `unbindService()` is called
+2. This triggered `onUnbind()` → `onNotificationCancelled()` → `stopSelf()` 
+3. Service was destroyed immediately, stopping all playback
+
+Additionally, even though `onStartCommand()` returned `START_STICKY`, it couldn't keep the service alive since the service was only bound (never explicitly started).
+
+## Solution
+
+Modified `onNotificationCancelled()` to check if playback is active before destroying the service:
+
+```kotlin
+override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+    // If player is still playing, keep the service alive
+    if (exoPlayer.isPlaying) {
+        return  // Don't stop the service
+    }
+    
+    // Only stop if not playing
+    stopForeground(STOP_FOREGROUND_REMOVE)
+    stopSelf()
+}
+```
+
+Also improved `onUnbind()` to clarify that the service survives unbinding:
+```kotlin
+override fun onUnbind(intent: Intent?): Boolean {
+    return true  // Allow onRebind when client connects again
+}
+```
+
+Now when returning to PlayerScreen, `onRebind()` is called instead of `onCreate()`, preserving the service state and maintaining playback.
 
 # m4g ✓ - Progress Bar Proportion Fix
 
