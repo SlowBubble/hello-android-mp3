@@ -185,8 +185,10 @@ fun PlayerScreen(
     DisposableEffect(context) {
         val intent = Intent(context, PlayerService::class.java)
         context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        Log.d("PlayerScreen", "bindService called")
 
         onDispose {
+            Log.d("PlayerScreen", "DisposableEffect(context) onDispose called, connected=$connected")
             if (connected) {
                 context.unbindService(connection)
             }
@@ -313,6 +315,7 @@ fun PlayerScreen(
                             }
                         } else {
                             // Single tap: toggle play/pause
+                            Log.d("PlayerScreen", "Single tap on background detected, calling onPlayPause")
                             service?.let { 
                                 onPlayPause(it)
                                 saveProgress()
@@ -364,6 +367,7 @@ fun PlayerScreen(
                 // Home button spanning the width between speed and X buttons
                 Button(
                     onClick = {
+                        Log.d("PlayerScreen", "Top home button clicked")
                         saveProgress()
                         onBack()
                     },
@@ -570,6 +574,7 @@ fun PlayerScreen(
                 // Home button - wide button below progress bar
                 Button(
                     onClick = {
+                        Log.d("PlayerScreen", "Bottom home button clicked")
                         saveProgress()
                         onBack()
                     },

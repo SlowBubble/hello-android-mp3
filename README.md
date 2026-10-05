@@ -1,4 +1,7 @@
 
+# m4h
+- regression: when I press the home button from a playing track's page, the track stop playing; it should keep playing
+
 # m4g ✓ - Progress Bar Proportion Fix
 
 Fixed grey progress bar in song list not being proportional to displayed duration.

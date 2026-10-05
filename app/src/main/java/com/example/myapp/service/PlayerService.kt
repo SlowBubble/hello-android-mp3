@@ -33,6 +33,7 @@ class PlayerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.d("PlayerService", "onCreate called")
         exoPlayer = ExoPlayer.Builder(this).build()
         
         // Create notification channel for Android O and above
@@ -63,7 +64,13 @@ class PlayerService : Service() {
             }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("PlayerService", "onStartCommand called with intent=$intent flags=$flags startId=$startId")
+        return START_STICKY
+    }
+
     override fun onDestroy() {
+        android.util.Log.d("PlayerService", "onDestroy called")
         playerNotificationManager?.setPlayer(null)
         mediaSession?.run {
             player.release()
@@ -74,7 +81,20 @@ class PlayerService : Service() {
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent?): IBinder {
+        android.util.Log.d("PlayerService", "onBind called with intent=$intent")
+        return binder
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        android.util.Log.d("PlayerService", "onUnbind called with intent=$intent")
+        return true // allow onRebind
+    }
+
+    override fun onRebind(intent: Intent?) {
+        super.onRebind(intent)
+        android.util.Log.d("PlayerService", "onRebind called with intent=$intent")
+    }
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -119,9 +139,11 @@ class PlayerService : Service() {
             notification: Notification,
             ongoing: Boolean
         ) {
+            android.util.Log.d("PlayerService", "onNotificationPosted: id=$notificationId ongoing=$ongoing")
             if (ongoing) {
                 try {
                     startForeground(notificationId, notification)
+                    android.util.Log.d("PlayerService", "startForeground succeeded")
                 } catch (e: Exception) {
                     // Handle ForegroundServiceStartNotAllowedException (API 31+)
                     // This can happen when transitioning between tracks in the background
@@ -135,6 +157,7 @@ class PlayerService : Service() {
                         @Suppress("DEPRECATION")
                         stopForeground(false)
                     }
+                    android.util.Log.d("PlayerService", "stopForeground detach succeeded")
                 } catch (e: Exception) {
                     android.util.Log.w("PlayerService", "Could not stop foreground: ${e.message}", e)
                 }
@@ -142,6 +165,7 @@ class PlayerService : Service() {
         }
 
         override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+            android.util.Log.d("PlayerService", "onNotificationCancelled: id=$notificationId dismissedByUser=$dismissedByUser")
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -162,6 +186,7 @@ class PlayerService : Service() {
     }
 
     fun playUri(uri: String) {
+        android.util.Log.d("PlayerService", "playUri: $uri")
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
             .setMediaMetadata(
@@ -176,6 +201,7 @@ class PlayerService : Service() {
     }
 
     fun loadUri(uri: String) {
+        android.util.Log.d("PlayerService", "loadUri: $uri")
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
             .setMediaMetadata(
@@ -191,14 +217,17 @@ class PlayerService : Service() {
     }
 
     fun stop() {
+        android.util.Log.d("PlayerService", "stop() called")
         exoPlayer.stop()
     }
 
     fun pause() {
+        android.util.Log.d("PlayerService", "pause() called")
         exoPlayer.pause()
     }
 
     fun play() {
+        android.util.Log.d("PlayerService", "play() called")
         exoPlayer.play()
     }
 

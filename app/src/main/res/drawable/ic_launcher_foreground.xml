@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Unfilled progress bar track base: Color.White.copy(alpha = 0.4f) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.40"
+        android:pathData="M30,44 H78 A10,10 0 0 1 88,54 A10,10 0 0 1 78,64 H30 A10,10 0 0 1 20,54 A10,10 0 0 1 30,44 Z" />
+
+    <!-- Vibrant green progress bar fill: Color(0xFF4ade80) -->
+    <path
+        android:fillColor="#4ade80"
+        android:fillAlpha="1.0"
+        android:pathData="M30,44 H54.2 A10,10 0 0 1 64.2,54 A10,10 0 0 1 54.2,64 H30 A10,10 0 0 1 20,54 A10,10 0 0 1 30,44 Z" />
+
+</vector>
