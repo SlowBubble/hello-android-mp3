@@ -70,7 +70,15 @@ class PlayerService : Service() {
     }
 
     override fun onDestroy() {
-        android.util.Log.d("PlayerService", "onDestroy called")
+        android.util.Log.d("PlayerService", "onDestroy called, isPlaying=${exoPlayer.isPlaying}")
+        
+        // If music is still playing, don't destroy the service
+        // This prevents cleanup when the service should continue in background
+        if (exoPlayer.isPlaying) {
+            android.util.Log.d("PlayerService", "Music still playing during onDestroy - NOT cleaning up resources")
+            return
+        }
+        
         playerNotificationManager?.setPlayer(null)
         mediaSession?.run {
             player.release()

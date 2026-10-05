@@ -9,38 +9,55 @@ When pressing the home button to leave the PlayerScreen, the music would stop in
 
 ## Root Cause
 
-The `onNotificationCancelled()` callback was always calling `stopSelf()`, which killed the service even if music was still playing. This happened because:
-1. When leaving PlayerScreen, `unbindService()` is called
-2. This triggered `onUnbind()` → `onNotificationCancelled()` → `stopSelf()` 
-3. Service was destroyed immediately, stopping all playback
-
-Additionally, even though `onStartCommand()` returned `START_STICKY`, it couldn't keep the service alive since the service was only bound (never explicitly started).
+Two related issues:
+1. `onNotificationCancelled()` was always calling `stopSelf()`, destroying the service when unbinding
+2. `onDestroy()` was releasing the player even while music was playing
 
 ## Solution
 
-Modified `onNotificationCancelled()` to check if playback is active before destroying the service:
+### PlayerService.kt
 
+Modified `onDestroy()` to check if playback is active before cleaning up:
+```kotlin
+override fun onDestroy() {
+    if (exoPlayer.isPlaying) {
+        return  // Don't destroy resources while playing
+    }
+    // Normal cleanup...
+}
+```
+
+Modified `onNotificationCancelled()` to keep service alive when music is playing:
 ```kotlin
 override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
-    // If player is still playing, keep the service alive
     if (exoPlayer.isPlaying) {
-        return  // Don't stop the service
+        return  // Keep service running
     }
-    
-    // Only stop if not playing
-    stopForeground(STOP_FOREGROUND_REMOVE)
+    stopForeground()
     stopSelf()
 }
 ```
 
-Also improved `onUnbind()` to clarify that the service survives unbinding:
+Improved `onUnbind()` to clarify the service survives unbinding:
 ```kotlin
 override fun onUnbind(intent: Intent?): Boolean {
     return true  // Allow onRebind when client connects again
 }
 ```
 
-Now when returning to PlayerScreen, `onRebind()` is called instead of `onCreate()`, preserving the service state and maintaining playback.
+### MainActivity.kt
+
+Added `onDestroy()` to provide explicit app shutdown control:
+```kotlin
+override fun onDestroy() {
+    super.onDestroy()
+    stopService(Intent(this, PlayerService::class.java))
+}
+```
+
+This ensures:
+- **Home button**: Service stays alive, `onRebind()` called on return
+- **Force-close app**: Service is explicitly stopped via `MainActivity.onDestroy()`
 
 # m4g ✓ - Progress Bar Proportion Fix
 
