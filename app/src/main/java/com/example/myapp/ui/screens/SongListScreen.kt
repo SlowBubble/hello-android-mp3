@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapp.data.Song
 import com.example.myapp.data.StorageManager
+import com.example.myapp.ui.screens.QueueUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -166,13 +167,18 @@ fun SongListScreen(
         storageManager.getHiddenTracks()
     }
 
-    val sortedAndFiltered = remember(songs, sortMode, hiddenTracks, showHidden) {
-        val sorted = songs.sortedAccordingTo(sortMode, storageManager, currentSongId)
-        val filtered = sorted.filter { song ->
-            val isHidden = storageManager.isTrackHidden(song)
-            if (showHidden) isHidden else !isHidden
+    val sortedAndFiltered = remember(songs, sortMode, hiddenTracks, showHidden, currentSongId) {
+        val baseQueue = QueueUtils.buildVisibleQueue(
+            songs = songs,
+            sortMode = sortMode,
+            hiddenTrackKeys = hiddenTracks,
+            currentSongId = currentSongId
+        )
+        if (showHidden) {
+            baseQueue.filter { storageManager.isTrackHidden(it) }
+        } else {
+            baseQueue.filterNot { storageManager.isTrackHidden(it) }
         }
-        filtered
     }
 
     // M4e: Auto-reset tracks that are within 25 seconds of the end

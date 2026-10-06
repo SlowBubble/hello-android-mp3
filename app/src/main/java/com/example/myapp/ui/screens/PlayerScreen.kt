@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.myapp.data.Song
 import com.example.myapp.data.StorageManager
 import com.example.myapp.service.PlayerService
+import com.example.myapp.ui.screens.QueueUtils
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
@@ -59,6 +60,7 @@ fun PlayerScreen(
     // Collect lastLoadedSongUri from ViewModel to track across navigation
     val lastLoadedSongUri by playerViewModel.lastLoadedSongUri.collectAsState()
     val currentVmSong by playerViewModel.currentSong.collectAsState()
+    val currentVmSongId by playerViewModel.currentSongId.collectAsState()
 
     // State to track if we've already handled this track ending
     var trackEndedHandled by remember { mutableStateOf(false) }
@@ -66,52 +68,19 @@ fun PlayerScreen(
 
     // Helper function to get the next track in sorted order (ignoring the pinned track)
     fun getVisibleQueue(): List<Song> {
-        if (songs.isEmpty()) return emptyList()
-
-        fun isHiddenTrack(track: Song): Boolean {
-            return storageManager.getHiddenTracks().any { hidden ->
-                hidden == track.id.toString() || hidden == track.uri.toString() || hidden == track.title
-            }
-        }
-
-        fun estimateDurationLocal(bytes: Long): Long {
-            if (bytes <= 0) return 0
-            val BYTES_PER_SECOND = 16000L
-            return (bytes / BYTES_PER_SECOND) * 1000
-        }
-
-        val sorted = when (storageManager.getSortIndex()) {
-            0 -> songs.sortedBy { track ->
-                storageManager.getTrackProgress(track)?.duration ?: estimateDurationLocal(track.fileSize)
-            }
-            1 -> songs.sortedByDescending { track ->
-                storageManager.getTrackProgress(track)?.duration ?: estimateDurationLocal(track.fileSize)
-            }
-            2 -> songs.sortedByDescending { it.dateModified }
-            else -> songs.sortedBy { it.dateModified }
-        }
-
-        val visible = sorted.filterNot(::isHiddenTrack)
-        if (visible.isEmpty()) return emptyList()
-
-        val currentInVisible = visible.find { it.id == song.id || it.uri == song.uri }
-        return if (currentInVisible != null) {
-            listOf(currentInVisible) + visible.filter { it.id != currentInVisible.id }
-        } else {
-            visible
-        }
+        val activeSongId = currentVmSongId ?: song.id
+        return QueueUtils.buildVisibleQueue(
+            songs = songs,
+            sortMode = storageManager.getSortIndex(),
+            hiddenTrackKeys = hiddenTracks,
+            currentSongId = activeSongId
+        )
     }
 
     fun getNextTrackInSortOrder(): Song? {
         val queue = getVisibleQueue()
-        if (queue.isEmpty()) return null
-
-        val currentIndex = queue.indexOfFirst { it.id == song.id || it.uri == song.uri }
-        return if (currentIndex >= 0) {
-            queue.getOrNull(currentIndex + 1) ?: queue.firstOrNull { it.id != song.id && it.uri != song.uri }
-        } else {
-            queue.firstOrNull()
-        }
+        val activeSongId = currentVmSongId ?: song.id
+        return QueueUtils.nextTrack(queue, activeSongId)
     }
 
     // Helper function to save progress
@@ -201,7 +170,7 @@ fun PlayerScreen(
                 if (binder is PlayerService.LocalBinder) {
                     service = binder.getService()
                     connected = true
-                    
+
                     // Remove any previous listener before adding a new one
                     if (currentPlayerListener != null) {
                         try {
@@ -211,7 +180,7 @@ fun PlayerScreen(
                             Log.w("PlayerScreen", "Error removing old listener: ${e.message}")
                         }
                     }
-                    
+
                     // Add listener for track end detection
                     val listener = object : Player.Listener {
                         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -224,13 +193,13 @@ fun PlayerScreen(
                                         Log.d("PlayerScreen", "Track ended: ${song.title}")
                                         // Save progress
                                         saveProgress()
-                                        
+
                                         // Hide current track
                                         storageManager.hideTrack(song)
-                                        
+
                                         // Find next track in sorted order
                                         val nextSong = getNextTrackInSortOrder()
-                                        
+
                                         if (nextSong != null) {
                                             Log.d("PlayerScreen", "Advancing to next track: ${nextSong.title}")
                                             onTrackHideAndNext(nextSong)
@@ -247,7 +216,7 @@ fun PlayerScreen(
                             }
                         }
                     }
-                    
+
                     currentPlayerListener = listener
                     service?.exoPlayer?.addListener(listener)
                     Log.d("PlayerScreen", "Added player listener for song: ${song.title}")

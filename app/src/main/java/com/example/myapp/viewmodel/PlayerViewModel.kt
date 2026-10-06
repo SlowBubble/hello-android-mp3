@@ -15,6 +15,9 @@ class PlayerViewModel : ViewModel() {
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
 
+    private val _currentSongId = MutableStateFlow<Long?>(null)
+    val currentSongId: StateFlow<Long?> = _currentSongId.asStateFlow()
+
     private val _currentTrackSession = MutableStateFlow<TrackSession?>(null)
     val currentTrackSession: StateFlow<TrackSession?> = _currentTrackSession.asStateFlow()
 
@@ -57,12 +60,21 @@ class PlayerViewModel : ViewModel() {
 
     fun setCurrentSong(song: Song) {
         _currentSong.value = song
+        _currentSongId.value = song.id
         _isPlaying.value = true
     }
 
     fun clearCurrentSong() {
         _currentSong.value = null
+        _currentSongId.value = null
         _isPlaying.value = false
+    }
+
+    fun setCurrentSongId(songId: Long?) {
+        _currentSongId.value = songId
+        if (songId == null) {
+            _currentSong.value = null
+        }
     }
 
     fun setIsPlaying(playing: Boolean) {
@@ -178,6 +190,8 @@ class PlayerViewModel : ViewModel() {
     fun cycleSortMode() {
         _sortMode.value = (_sortMode.value + 1) % 4
     }
+
+    // M5e cleanup: canonical queue logic lives in a shared helper, not in the ViewModel.
 }
 
 
