@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TrackProgress(
     val trackName: String,
+    val trackId: Long? = null,            // Explicit track ID to tie progress to the canonical song ID
     val currentTime: Long = 0,           // Current playback position in ms
     val duration: Long = 0,              // Total duration in ms
     val lastPlayed: Long = 0,            // Timestamp of last play

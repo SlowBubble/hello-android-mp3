@@ -66,8 +66,7 @@ fun NavigationHost(
                     // Restore last active track if it exists
                     val lastActiveTrackName = storageManager.getLastActiveTrack()
                     val lastActiveSong = found.find { song ->
-                        song.id.toString() == lastActiveTrackName ||
-                        song.uri.toString() == lastActiveTrackName
+                        song.id.toString() == lastActiveTrackName
                     }
                     if (lastActiveSong != null) {
                         playerViewModel.setCurrentSong(lastActiveSong)
@@ -105,8 +104,7 @@ fun NavigationHost(
                         // Restore last active track
                         val lastActiveTrackName = storageManager.getLastActiveTrack()
                         val lastActiveSong = found.find { song ->
-                            song.id.toString() == lastActiveTrackName ||
-                            song.uri.toString() == lastActiveTrackName
+                            song.id.toString() == lastActiveTrackName
                         }
                         if (lastActiveSong != null) {
                             playerViewModel.setCurrentSong(lastActiveSong)
@@ -279,9 +277,22 @@ fun NavigationHost(
                     },
                     onBack = { navController.popBackStack() },
                     onTrackHideAndNext = { nextSong ->
+                        playerViewModel.setLastLoadedSongUri("")
                         playerViewModel.setCurrentSong(nextSong)
                         playerViewModel.setIsPlaying(true)
-                        // Stay on player screen with new song
+                        if (navController.currentDestination?.route == "player") {
+                            navController.popBackStack(route = "player", inclusive = true)
+                        }
+                        navController.navigate("player")
+                    },
+                    onSkipToNext = { nextSong ->
+                        playerViewModel.setLastLoadedSongUri("")
+                        playerViewModel.setCurrentSong(nextSong)
+                        playerViewModel.setIsPlaying(true)
+                        if (navController.currentDestination?.route == "player") {
+                            navController.popBackStack(route = "player", inclusive = true)
+                        }
+                        navController.navigate("player")
                     }
                 )
             }

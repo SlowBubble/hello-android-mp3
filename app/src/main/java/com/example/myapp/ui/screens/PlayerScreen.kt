@@ -42,6 +42,7 @@ fun PlayerScreen(
     hiddenTracks: List<String> = emptyList(),
     currentSongIndex: Int = 0,
     onTrackHideAndNext: (nextSong: Song) -> Unit = {},
+    onSkipToNext: (nextSong: Song) -> Unit = {},
     playerViewModel: com.example.myapp.viewmodel.PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -57,28 +58,29 @@ fun PlayerScreen(
     
     // Collect lastLoadedSongUri from ViewModel to track across navigation
     val lastLoadedSongUri by playerViewModel.lastLoadedSongUri.collectAsState()
+    val currentVmSong by playerViewModel.currentSong.collectAsState()
 
     // State to track if we've already handled this track ending
     var trackEndedHandled by remember { mutableStateOf(false) }
     var currentPlayerListener by remember { mutableStateOf<Player.Listener?>(null) }
 
     // Helper function to get the next track in sorted order (ignoring the pinned track)
-    fun getNextTrackInSortOrder(): Song? {
-        if (songs.isEmpty()) return null
-        
-        val hiddenSet = hiddenTracks.toSet()
-        val sortIndex = storageManager.getSortIndex()
-        val currentSongUri = song.uri.toString()
-        
-        // Estimate duration from file size (128 kbps average bitrate)
+    fun getVisibleQueue(): List<Song> {
+        if (songs.isEmpty()) return emptyList()
+
+        fun isHiddenTrack(track: Song): Boolean {
+            return storageManager.getHiddenTracks().any { hidden ->
+                hidden == track.id.toString() || hidden == track.uri.toString() || hidden == track.title
+            }
+        }
+
         fun estimateDurationLocal(bytes: Long): Long {
             if (bytes <= 0) return 0
             val BYTES_PER_SECOND = 16000L
             return (bytes / BYTES_PER_SECOND) * 1000
         }
-        
-        // Sort according to current sort mode, but without pinning the current track
-        val sorted = when (sortIndex) {
+
+        val sorted = when (storageManager.getSortIndex()) {
             0 -> songs.sortedBy { track ->
                 storageManager.getTrackProgress(track)?.duration ?: estimateDurationLocal(track.fileSize)
             }
@@ -88,33 +90,108 @@ fun PlayerScreen(
             2 -> songs.sortedByDescending { it.dateModified }
             else -> songs.sortedBy { it.dateModified }
         }
-        
-        // Find current song in sorted list by URI (stable identifier)
-        val currentIndex = sorted.indexOfFirst { it.uri.toString() == currentSongUri }
-        if (currentIndex < 0) return null
-        
-        // Find next non-hidden track after current position
-        return sorted.drop(currentIndex + 1).firstOrNull { track ->
-            val isHidden = hiddenSet.any { hidden ->
-                hidden == track.id.toString() || hidden == track.uri.toString() || hidden == track.title
-            }
-            !isHidden
+
+        val visible = sorted.filterNot(::isHiddenTrack)
+        if (visible.isEmpty()) return emptyList()
+
+        val currentInVisible = visible.find { it.id == song.id || it.uri == song.uri }
+        return if (currentInVisible != null) {
+            listOf(currentInVisible) + visible.filter { it.id != currentInVisible.id }
+        } else {
+            visible
+        }
+    }
+
+    fun getNextTrackInSortOrder(): Song? {
+        val queue = getVisibleQueue()
+        if (queue.isEmpty()) return null
+
+        val currentIndex = queue.indexOfFirst { it.id == song.id || it.uri == song.uri }
+        return if (currentIndex >= 0) {
+            queue.getOrNull(currentIndex + 1) ?: queue.firstOrNull { it.id != song.id && it.uri != song.uri }
+        } else {
+            queue.firstOrNull()
         }
     }
 
     // Helper function to save progress
+    fun saveProgressForSong(targetSong: Song) {
+        val activeSongId = playerViewModel.currentSong.value?.id
+        if (activeSongId != null && activeSongId != targetSong.id) {
+            Log.d(
+                "PlayerScreen",
+                "Skipping stale save for id=${targetSong.id} because active song is id=$activeSongId"
+            )
+            return
+        }
+
+        if (service == null) {
+            Log.d("PlayerScreen", "saveProgressForSong skipped: no service for id=${targetSong.id}")
+            return
+        }
+
+        val pos = service!!.getCurrentPosition()
+        val dur = service!!.getDuration()
+        Log.d(
+            "PlayerScreen",
+            "saveProgressForSong: id=${targetSong.id} title=${targetSong.title} pos=$pos dur=$dur"
+        )
+
+        if (pos < 0 || dur <= 0 || dur == Long.MIN_VALUE || dur == Long.MIN_VALUE + 1) {
+            Log.d(
+                "PlayerScreen",
+                "Ignoring invalid duration for id=${targetSong.id}: pos=$pos dur=$dur"
+            )
+            return
+        }
+
+        val progress = storageManager.getTrackProgress(targetSong)
+            ?: com.example.myapp.data.TrackProgress(trackName = targetSong.title, trackId = targetSong.id)
+        val updated = progress.copy(
+            trackId = targetSong.id,
+            trackName = targetSong.title,
+            currentTime = pos,
+            duration = dur
+        )
+        storageManager.saveTrackProgress(targetSong, updated)
+        Log.d(
+            "PlayerScreen",
+            "saved progress for id=${targetSong.id}: currentTime=${updated.currentTime} duration=${updated.duration}"
+        )
+    }
+
+    // Helper function to save progress
     fun saveProgress() {
-        if (service != null) {
-            val pos = service!!.getCurrentPosition()
-            val dur = service!!.getDuration()
-            
-            if (dur > 0) {
-                val progress = storageManager.getTrackProgress(song)
-                    ?: com.example.myapp.data.TrackProgress(song.title)
-                
-                val updated = progress.copy(currentTime = pos, duration = dur)
-                storageManager.saveTrackProgress(song, updated)
-            }
+        saveProgressForSong(song)
+    }
+
+    fun moveToNextTrack(hideCurrent: Boolean) {
+        val previousSong = song
+        val nextSong = getNextTrackInSortOrder() ?: return
+        val nextUri = nextSong.uri.toString()
+
+        Log.d(
+            "PlayerScreen",
+            "moveToNextTrack: from id=${previousSong.id} title=${previousSong.title} to id=${nextSong.id} title=${nextSong.title} hideCurrent=$hideCurrent"
+        )
+
+        // Save the old song while it is still the active player state.
+        saveProgressForSong(previousSong)
+
+        if (hideCurrent) {
+            storageManager.hideTrack(previousSong)
+        }
+
+        // Advance the active song before the service switch so any stale delayed saves
+        // from the old composable will be skipped instead of writing the next track's
+        // duration into the previous track's persisted progress.
+        playerViewModel.setLastLoadedSongUri(nextUri)
+        playerViewModel.setCurrentSong(nextSong)
+        playerViewModel.setIsPlaying(true)
+
+        service?.let { svc ->
+            svc.loadUri(nextUri)
+            svc.play()
         }
     }
 
@@ -285,6 +362,17 @@ fun PlayerScreen(
         }
     }
 
+    // When the screen is replaced by a new current song, make sure the current track's
+    // progress is recorded before we drop this composable, otherwise the old entry can stay
+    // keyed to the new duration by a stale SharedPreferences record.
+    DisposableEffect(song.uri.toString()) {
+        onDispose {
+            if (service != null) {
+                saveProgress()
+            }
+        }
+    }
+
     // Gesture handling for double-tap
     var lastTapTime by remember { mutableLongStateOf(0L) }
     var lastTapX by remember { mutableFloatStateOf(0f) }
@@ -300,38 +388,6 @@ fun PlayerScreen(
                 },
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp)
             )
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offset ->
-                        val currentTime = System.currentTimeMillis()
-                        val timeDiff = currentTime - lastTapTime
-                        lastTapTime = currentTime
-                        lastTapX = offset.x
-
-                        // Check if this is a double-tap (within 300ms of last tap)
-                        if (timeDiff < 300) {
-                            // Double tap detected
-                            val screenWidth = size.width
-                            val isLeftHalf = lastTapX < screenWidth / 2f
-
-                            if (isLeftHalf) {
-                                // Double tap left: rewind 45 seconds
-                                service?.let { it.seekTo((it.getCurrentPosition() - 45000).coerceAtLeast(0)) }
-                            } else {
-                                // Double tap right: forward 45 seconds
-                                service?.let { it.seekTo((it.getCurrentPosition() + 45000).coerceAtMost(duration)) }
-                            }
-                        } else {
-                            // Single tap: toggle play/pause
-                            Log.d("PlayerScreen", "Single tap on background detected, calling onPlayPause")
-                            service?.let { 
-                                onPlayPause(it)
-                                saveProgress()
-                            }
-                        }
-                    }
-                )
-            }
     ) {
         Column(
             modifier = Modifier
@@ -394,17 +450,7 @@ fun PlayerScreen(
                 // X button: hide current track and play next
                 Button(
                     onClick = {
-                        storageManager.hideTrack(song)
-                        
-                        // Find next track in sorted order
-                        val nextSong = getNextTrackInSortOrder()
-                        
-                        if (nextSong != null) {
-                            onTrackHideAndNext(nextSong)
-                        } else {
-                            // No more non-hidden tracks, go back to home
-                            onBack()
-                        }
+                        moveToNextTrack(hideCurrent = true)
                     },
                     modifier = Modifier
                         .size(48.dp),
@@ -444,7 +490,39 @@ fun PlayerScreen(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    val currentTime = System.currentTimeMillis()
+                                    val timeDiff = currentTime - lastTapTime
+                                    lastTapTime = currentTime
+                                    lastTapX = offset.x
+
+                                    // Check if this is a double-tap (within 300ms of last tap)
+                                    if (timeDiff < 300) {
+                                        // Double tap left: rewind 45 seconds
+                                        val screenWidth = size.width
+                                        val isLeftHalf = lastTapX < screenWidth / 2f
+
+                                        if (isLeftHalf) {
+                                            // Double tap left: rewind 45 seconds
+                                            service?.let { it.seekTo((it.getCurrentPosition() - 45000).coerceAtLeast(0)) }
+                                        } else {
+                                            // Double tap right: forward 45 seconds
+                                            service?.let { it.seekTo((it.getCurrentPosition() + 45000).coerceAtMost(duration)) }
+                                        }
+                                    } else {
+                                        // Single tap: toggle play/pause
+                                        Log.d("PlayerScreen", "Single tap on background detected, calling onPlayPause")
+                                        service?.let {
+                                            onPlayPause(it)
+                                            saveProgress()
+                                        }
+                                    }
+                                }
+                            )
+                        },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -580,20 +658,41 @@ fun PlayerScreen(
                 }
 
                 // Home button - wide button below progress bar
-                Button(
-                    onClick = {
-                        Log.d("PlayerScreen", "Bottom home button clicked")
-                        saveProgress()
-                        onBack()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(alpha = 0.15f)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("🏠 Home", fontSize = 16.sp, color = Color.White)
+                    Button(
+                        onClick = {
+                            Log.d("PlayerScreen", "Bottom home button clicked")
+                            saveProgress()
+                            onBack()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text("🏠 Home", fontSize = 16.sp, color = Color.White)
+                    }
+
+                    Button(
+                        onClick = {
+                            Log.d("PlayerScreen", "Bottom next button clicked. currentSong=${song.title} serviceConnected=$connected")
+                            moveToNextTrack(hideCurrent = false)
+                        },
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF10b981).copy(alpha = 0.25f)
+                        ),
+                        enabled = songs.isNotEmpty()
+                    ) {
+                        Text("Next ⏭", fontSize = 16.sp, color = Color.White)
+                    }
                 }
             }
         }

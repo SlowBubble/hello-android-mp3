@@ -32,13 +32,13 @@ class StorageManager(private val context: Context) {
 
     // ============== Track Progress ==============
     fun saveTrackProgress(song: Song, progress: TrackProgress) {
-        saveTrackProgress(songKey(song), progress)
+        val canonical = progress.copy(trackId = song.id, trackName = song.title)
+        saveTrackProgress(songKey(song), canonical)
     }
 
     fun getTrackProgress(song: Song): TrackProgress? {
-        return getTrackProgress(songKey(song))
-            ?: getTrackProgress(song.uri.toString())
-            ?: getTrackProgress(song.title)
+        val byId = getTrackProgress(songKey(song)) ?: return null
+        return if (byId.trackId == null || byId.trackId == song.id) byId else null
     }
 
     // Backwards-compatible raw-key lookup used by older code paths
@@ -64,24 +64,22 @@ class StorageManager(private val context: Context) {
 
     // ============== Hidden Tracks ==============
     fun hideTrack(song: Song) {
+        val canonicalKey = songKey(song)
         val hidden = getHiddenTracks().toMutableList()
-        listOf(songKey(song), song.uri.toString(), song.title).forEach { key ->
-            if (!hidden.contains(key)) hidden.add(key)
+        if (!hidden.contains(canonicalKey)) {
+            hidden.add(canonicalKey)
         }
         saveHiddenTracks(hidden)
     }
 
     fun unhideTrack(song: Song) {
         val hidden = getHiddenTracks().toMutableList()
-        listOf(songKey(song), song.uri.toString(), song.title).forEach { key ->
-            hidden.remove(key)
-        }
+        hidden.remove(songKey(song))
         saveHiddenTracks(hidden)
     }
 
     fun isTrackHidden(song: Song): Boolean {
-        val hidden = getHiddenTracks().toSet()
-        return listOf(songKey(song), song.uri.toString(), song.title).any { hidden.contains(it) }
+        return getHiddenTracks().contains(songKey(song))
     }
 
     fun hideTrack(trackName: String) {
@@ -139,8 +137,6 @@ class StorageManager(private val context: Context) {
     fun getLastActiveTrackSong(songs: List<Song>): Song? {
         val value = getLastActiveTrack() ?: return null
         return songs.find { songKey(it) == value }
-            ?: songs.find { it.uri.toString() == value }
-            ?: songs.find { it.title == value }
     }
 
     fun clearLastActiveTrack() {
@@ -247,7 +243,7 @@ class StorageManager(private val context: Context) {
 
     // ============== Playback Statistics ==============
     fun updateLastPlayedDate(trackName: String) {
-        val progress = getTrackProgress(trackName) ?: TrackProgress(trackName)
+        val progress = getTrackProgress(trackName) ?: TrackProgress(trackName = trackName)
         val updated = progress.copy(
             lastPlayed = System.currentTimeMillis(),
             firstListened = progress.firstListened ?: System.currentTimeMillis(),
@@ -257,7 +253,7 @@ class StorageManager(private val context: Context) {
     }
 
     fun addListeningTime(trackName: String, timeMs: Long) {
-        val progress = getTrackProgress(trackName) ?: TrackProgress(trackName)
+        val progress = getTrackProgress(trackName) ?: TrackProgress(trackName = trackName)
         val updated = progress.copy(totalListeningTime = progress.totalListeningTime + timeMs)
         saveTrackProgress(trackName, updated)
     }

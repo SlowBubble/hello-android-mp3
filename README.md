@@ -1,3 +1,39 @@
+# m5c
+- Make the rewind and forward 45s buttons 1.5x in width
+  - this may also affect the top row of buttons, which is okay (i.e. the X button will be wider also)
+- Make the top row of buttons on the player page 1.5x in height
+
+# m5b ✓ - Next Track Control Using Displayed Queue
+Add a Next button to the right of  the home button on the bottom, that skips to the next track (respecting the current sorting) without hiding the current track.
+
+## Problem
+The app had multiple competing notions of “what comes next”:
+- the raw sorted song list
+- a hidden-track filtered list
+- a stale current-song state
+- the pinned current item in the UI
+- stale save callbacks that could overwrite the previous song’s persisted progress/duration after the service had already switched to the next track
+
+That caused the next-track action to fail or fall back to the home screen because it wasn’t using the same ordering as the actual displayed list. The final bug was especially subtle: a delayed save from the old song could still run after the service had already loaded the next item, so the previous track inherited the next track’s duration.
+
+## Fix
+We unified the next-track logic around the displayed queue, which is the source of truth:
+- current song stays pinned at the top of the effective queue
+- the remaining queue is the current sort order with hidden tracks removed
+- manual Next advances to the next item in that queue
+- X follows the same queue logic, but hides the current item before moving on
+- the ViewModel current song is updated immediately after the move so the next lookup starts from the new pinned track
+- progress is saved for the exact previous song ID before switching media, and stale saves are ignored if they do not match the currently active song ID
+- persisted progress/duration are now scoped to the canonical song ID so the old song keeps its own duration instead of inheriting the next track’s metadata
+
+## Result
+✅ Next respects the current sort mode
+✅ Next does not hide the current track
+✅ X and Next use the same queue behavior
+✅ The app stays aligned with the visible list instead of drifting across stale state
+✅ Saved track durations remain tied to the correct song after skipping forward
+✅ Verified after restart and manual testing: Next advances correctly without overwriting the previous track’s progress or duration
+
 # m5a ✓ - Canonical Track Identity Cleanup
 Design things more cleanly to try fixing bugs that keep recurring.
 
