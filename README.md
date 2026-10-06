@@ -1,5 +1,66 @@
-# m5d
-Bug 1: when I press next and then press on home page, the demarcation between the pinned track and the first track in the sorted list is gone
+
+# m5e - Single-Source-of-Truth Cleanup
+
+This is the follow-up cleanup we should do to prevent these bugs from recurring.
+
+## Why it is still messy
+The app still has multiple “current song” and “queue” sources floating around:
+- `PlayerViewModel.currentSong`
+- the `song` argument passed into `PlayerScreen`
+- `currentSongId` in `SongListScreen`
+- the locally recomputed sorted/filtered list in the UI
+- `lastLoadedSongUri` used as a side-channel to avoid reload loops
+- list state that is partially derived in `MainActivity`, partially in `PlayerScreen`, and partially in `SongListScreen`
+
+That means some transitions are correct only because of side effects, delayed disposal, or a lucky recomposition timing.
+
+## Target architecture
+We want exactly one canonical source of truth for the active queue:
+- one function that builds the visible queue from `songs + sortMode + hiddenTracks`
+- one canonical current-song id (or stable song id) as the pinned item
+- all UI reads use that queue and id, never local ad hoc matching
+- player navigation and list navigation both operate on the same queue output
+
+## Proposed cleanup
+1. Centralize queue construction in a single helper, e.g. `buildVisibleQueue(songs, sortMode, hiddenTracks, currentSongId)`.
+2. Use `Song.id` as the single identity source for queue state, not a mix of `id`, `uri`, and title comparisons.
+3. Store only the active song id in the ViewModel, not a mutable copy of the full song object everywhere.
+4. Make `SongListScreen` derive the pinned boundary from the canonical queue, not from `prevSong` comparisons or stale object instances.
+5. Make `PlayerScreen` ask the queue for “next” instead of re-deriving its own sorting logic.
+6. Remove stale “fix-up” logic in `onDispose` whenever the canonical state already moved forward.
+
+## Benefits
+- No stale screen can overwrite the newer song
+- The list divider logic is deterministic and tied to the same queue as the player
+- Hidden/home page logic uses the same source of truth for visibility, sorting, and pinning
+- Bugs become easier to reason about because the UI is no longer re-inventing queue state in multiple places
+
+## Guiding rule
+If a state value can be derived from the canonical queue, it should be derived there — not duplicated in each screen.
+
+
+# m5d ✓ - Demarcation and Hidden Page Controls
+
+## Problem
+Two regressions were still showing up in the home/hidden list flow:
+- After pressing Next and then returning Home, the divider between the pinned current track and the first track in the sorted list disappeared.
+- On the hidden page, when there were zero hidden tracks, the navigation controls disappeared, leaving the page with no way back to Home.
+
+## Root cause
+The bug was caused by two parallel state issues:
+1. The old `PlayerScreen` could still dispose after a Next action and re-assert the previous song as the active current song, even though the ViewModel had already advanced.
+2. The demarcation logic was still relying on stale song-object matching instead of the current visible pinned position in the queue.
+3. The hidden-page empty state replaced the normal list UI entirely, so the nav controls were never rendered when the list was empty.
+
+## Fix
+- Added a stale-state guard in `PlayerScreen` disposal so an older song cannot overwrite the newer current song after a Next/skip transition.
+- Updated the divider check to anchor the boundary to the current visible pinned track in the displayed queue instead of only comparing stale object identity.
+- Kept the Home/Hidden navigation controls rendered before the empty-state text, so the hidden page still shows navigation even with zero items.
+
+## Result
+✅ The divider remains after Next + Home
+✅ Hidden page keeps nav controls even when empty
+✅ The stale-screen overwrite is prevented during rapid transitions
 
 # m5c
 - Make the rewind and forward 45s buttons 1.5x in width

@@ -353,11 +353,21 @@ fun PlayerScreen(
     // Save when screen is disposed (user navigates away)
     DisposableEffect(Unit) {
         onDispose {
-            saveProgress()
+            val vmCurrentSong = playerViewModel.currentSong.value
+            val shouldPreserveNewerSong = vmCurrentSong != null && vmCurrentSong.id != song.id
+
             if (service != null && service!!.isPlaying()) {
+                if (shouldPreserveNewerSong) {
+                    // A newer current song was already selected (e.g. user pressed Next),
+                    // so do not overwrite it with this stale song on dispose.
+                    return@onDispose
+                }
                 playerViewModel.setCurrentSong(song)
             } else {
-                playerViewModel.clearCurrentSong()
+                // If the current song in the VM is already different, keep the newer selection.
+                if (!shouldPreserveNewerSong) {
+                    playerViewModel.clearCurrentSong()
+                }
             }
         }
     }

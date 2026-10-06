@@ -97,8 +97,13 @@ private fun shouldAddDemarcation(
     storageManager: StorageManager,
     pinnedSong: Song?
 ): Boolean {
-    // After pinned track, always add demarcation
-    if (pinnedSong != null && prevSong.uri == pinnedSong.uri) {
+    val samePinnedSong = pinnedSong != null && (prevSong.id == pinnedSong.id || prevSong.uri == pinnedSong.uri)
+    val visiblePinnedBoundary = pinnedSong != null && prevSong.id == pinnedSong.id
+
+    // After pinned track, always add demarcation.
+    // This must stay true even when the list has been re-sorted or the song object
+    // itself is stale, so use the pinned song identity as the primary boundary.
+    if (samePinnedSong || visiblePinnedBoundary) {
         return true
     }
 
@@ -196,27 +201,61 @@ fun SongListScreen(
             .padding(16.dp)
     ) {
         // Playlist
-        if (sortedAndFiltered.isEmpty()) {
-            Text(
-                if (showHidden) "No hidden tracks" else "No MP3 files found",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.8f)
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Controls - different for home and hidden pages (as regular items, non-sticky)
-                item {
-                    if (showHidden) {
-                        // Hidden page: only "Home" button
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Controls - different for home and hidden pages (as regular items, non-sticky)
+            item {
+                if (showHidden) {
+                    // Hidden page: only "Home" button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Button(
+                            onClick = { showHidden = !showHidden },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                            )
+                        ) {
+                            Text(
+                                "Home",
+                                fontSize = 14.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
+                } else {
+                    // Home page: two rows of buttons at the top
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Row 1: Folder | Hidden
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
-                            horizontalArrangement = Arrangement.Center
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            Button(
+                                onClick = { onFolderButtonClick?.invoke() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                ),
+                                enabled = onFolderButtonClick != null
+                            ) {
+                                Text("Folder", fontSize = 14.sp, color = Color.White)
+                            }
                             Button(
                                 onClick = { showHidden = !showHidden },
                                 modifier = Modifier
@@ -226,110 +265,88 @@ fun SongListScreen(
                                     containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
                                 )
                             ) {
+                                Text("Hidden", fontSize = 14.sp, color = Color.White)
+                            }
+                        }
+
+                        // Row 2: Switch | Sort
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onSwitchButtonClick?.invoke() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                ),
+                                enabled = onSwitchButtonClick != null
+                            ) {
+                                val label = if (isShowingAllFolders) "All" else folderDisplayName
+                                Text(label, fontSize = 14.sp, color = Color.White)
+                            }
+                            Button(
+                                onClick = {
+                                    sortMode = (sortMode + 1) % SortMode.values().size
+                                    storageManager.setSortIndex(sortMode)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
                                 Text(
-                                    "Home",
+                                    "${SortMode.values()[sortMode].label} | ${SortMode.values()[sortMode].symbol}",
                                     fontSize = 14.sp,
                                     color = Color.White
                                 )
                             }
                         }
-                    } else {
-                        // Home page: two rows of buttons at the top
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Row 1: Folder | Hidden
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { onFolderButtonClick?.invoke() },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                    ),
-                                    enabled = onFolderButtonClick != null
-                                ) {
-                                    Text("Folder", fontSize = 14.sp, color = Color.White)
-                                }
-                                Button(
-                                    onClick = { showHidden = !showHidden },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Text("Hidden", fontSize = 14.sp, color = Color.White)
-                                }
-                            }
-
-                            // Row 2: Switch | Sort
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { onSwitchButtonClick?.invoke() },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                    ),
-                                    enabled = onSwitchButtonClick != null
-                                ) {
-                                    val label = if (isShowingAllFolders) "All" else folderDisplayName
-                                    Text(label, fontSize = 14.sp, color = Color.White)
-                                }
-                                Button(
-                                    onClick = {
-                                        sortMode = (sortMode + 1) % SortMode.values().size
-                                        storageManager.setSortIndex(sortMode)
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                                    )
-                                ) {
-                                    Text(
-                                        "${SortMode.values()[sortMode].label} | ${SortMode.values()[sortMode].symbol}",
-                                        fontSize = 14.sp,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
+            }
 
-                item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
 
+            if (sortedAndFiltered.isEmpty()) {
+                item {
+                    Text(
+                        if (showHidden) "No hidden tracks" else "No MP3 files found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+            } else {
                 // Build items with demarcations
                 val itemsWithDemarcations = mutableListOf<SongListItem>()
                 var prevSong: Song? = null
                 var prevProgress: com.example.myapp.data.TrackProgress? = null
                 val pinnedSong = sortedAndFiltered.find { it.id == currentSongId }
+                val pinnedSongIndex = visibleSongs.indexOfFirst { song ->
+                    pinnedSong != null && (song.id == pinnedSong.id || song.uri == pinnedSong.uri)
+                }
 
                 visibleSongs.forEachIndexed { index, song ->
                     val progress = storageManager.getTrackProgress(song)
                     val isCurrentTrack = song.id == currentSongId
+                    val prevSongIndex = if (prevSong == null) null else visibleSongs.indexOfFirst { candidate ->
+                        candidate.id == prevSong!!.id || candidate.uri == prevSong!!.uri
+                    }
 
                     // Determine if we need a demarcation before this song
                     val needsDemarcation = if (prevSong == null) {
                         // First item: no demarcation before it
                         false
+                    } else if (pinnedSongIndex >= 0 && prevSongIndex == pinnedSongIndex) {
+                        // The item immediately after the pinned track always gets a divider,
+                        // even when the song object identity is stale after a Next jump.
+                        true
                     } else {
                         // Check if we've crossed a boundary
                         shouldAddDemarcation(
@@ -433,8 +450,6 @@ fun SongListScreen(
                         }
                     }
                 }
-
-
             }
         }
     }
