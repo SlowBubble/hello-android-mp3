@@ -164,7 +164,7 @@ fun SongListScreen(
     val sortedAndFiltered = remember(songs, sortMode, hiddenTracks, showHidden) {
         val sorted = songs.sortedAccordingTo(sortMode, storageManager, currentSongId)
         val filtered = sorted.filter { song ->
-            val isHidden = hiddenTracks.contains(song.title)
+            val isHidden = storageManager.isTrackHidden(song)
             if (showHidden) isHidden else !isHidden
         }
         filtered
@@ -174,13 +174,13 @@ fun SongListScreen(
     val visibleSongs = remember(sortedAndFiltered, visibleCount) {
         val songs = sortedAndFiltered.take(visibleCount)
         songs.forEach { song ->
-            val progress = storageManager.getTrackProgress(song.title)
+            val progress = storageManager.getTrackProgress(song)
             if (progress != null && progress.duration > 0 && progress.currentTime > 0) {
                 val timeToEnd = progress.duration - progress.currentTime
                 // If within 25 seconds of the end, reset current time to 0
                 if (timeToEnd < 25000) { // 25 seconds in milliseconds
                     val resetProgress = progress.copy(currentTime = 0)
-                    storageManager.saveTrackProgress(song.title, resetProgress)
+                    storageManager.saveTrackProgress(song, resetProgress)
                 }
             }
         }
@@ -323,7 +323,7 @@ fun SongListScreen(
                 val pinnedSong = sortedAndFiltered.find { it.id == currentSongId }
 
                 visibleSongs.forEachIndexed { index, song ->
-                    val progress = storageManager.getTrackProgress(song.title)
+                    val progress = storageManager.getTrackProgress(song)
                     val isCurrentTrack = song.id == currentSongId
 
                     // Determine if we need a demarcation before this song
@@ -370,36 +370,36 @@ fun SongListScreen(
                             val song = item.song
                             // Calculate max duration across all visible songs using actual saved durations
                             val maxDurationMs = visibleSongs.maxOfOrNull { s ->
-                                storageManager.getTrackProgress(s.title)?.duration?.takeIf { it > 0 }
+                                storageManager.getTrackProgress(s)?.duration?.takeIf { it > 0 }
                                     ?: estimateDuration(s.fileSize)
                             } ?: 1L
                             
                             SongListItemComposable(
                                 song = song,
                                 isActive = song.id == currentSongId,
-                                progress = storageManager.getTrackProgress(song.title),
+                                progress = storageManager.getTrackProgress(song),
                                 maxFileSize = songs.maxOf { it.fileSize },
-                                isHidden = hiddenTracks.contains(song.title),
+                                isHidden = storageManager.isTrackHidden(song),
                                 onSongClick = { 
                                     // M4e: Auto-unhide if playing from hidden page
                                     if (showHidden) {
-                                        storageManager.unhideTrack(song.title)
+                                        storageManager.unhideTrack(song)
                                         hiddenTracksRefresh++
                                     }
                                     onSongClick(song) 
                                 },
                                 onHideClick = {
-                                    storageManager.hideTrack(song.title)
+                                    storageManager.hideTrack(song)
                                     hiddenTracksRefresh++
                                 },
                                 onRestoreClick = {
-                                    storageManager.unhideTrack(song.title)
+                                    storageManager.unhideTrack(song)
                                     hiddenTracksRefresh++
                                 },
                                 onDeleteClick = {
                                     // Delete the file from disk
                                     storageManager.deleteTrack(song.title, song.uri)
-                                    storageManager.unhideTrack(song.title) // Also remove from hidden list
+                                    storageManager.unhideTrack(song)
                                     onSongDeleted?.invoke(song) // Notify parent to remove from list
                                     hiddenTracksRefresh++
                                 },
@@ -615,10 +615,10 @@ private fun List<Song>.sortedAccordingTo(
     
     val sorted = when (SortMode.values()[sortMode]) {
         SortMode.SHORTEST -> this.sortedBy { song ->
-            storageManager.getTrackProgress(song.title)?.duration ?: estimateDuration(song.fileSize)
+            storageManager.getTrackProgress(song)?.duration ?: estimateDuration(song.fileSize)
         }
         SortMode.LONGEST -> this.sortedByDescending { song ->
-            storageManager.getTrackProgress(song.title)?.duration ?: estimateDuration(song.fileSize)
+            storageManager.getTrackProgress(song)?.duration ?: estimateDuration(song.fileSize)
         }
         SortMode.NEWEST -> this.sortedByDescending { it.dateModified }
         SortMode.OLDEST -> this.sortedBy { it.dateModified }

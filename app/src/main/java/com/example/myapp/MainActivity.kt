@@ -65,7 +65,10 @@ fun NavigationHost(
                     
                     // Restore last active track if it exists
                     val lastActiveTrackName = storageManager.getLastActiveTrack()
-                    val lastActiveSong = found.find { song -> song.title == lastActiveTrackName }
+                    val lastActiveSong = found.find { song ->
+                        song.id.toString() == lastActiveTrackName ||
+                        song.uri.toString() == lastActiveTrackName
+                    }
                     if (lastActiveSong != null) {
                         playerViewModel.setCurrentSong(lastActiveSong)
                     }
@@ -101,7 +104,10 @@ fun NavigationHost(
                         
                         // Restore last active track
                         val lastActiveTrackName = storageManager.getLastActiveTrack()
-                        val lastActiveSong = found.find { song -> song.title == lastActiveTrackName }
+                        val lastActiveSong = found.find { song ->
+                            song.id.toString() == lastActiveTrackName ||
+                            song.uri.toString() == lastActiveTrackName
+                        }
                         if (lastActiveSong != null) {
                             playerViewModel.setCurrentSong(lastActiveSong)
                         }
@@ -228,7 +234,7 @@ fun NavigationHost(
                 val songToPlay = currentSong
                 LaunchedEffect(songToPlay) {
                     val storageManager = com.example.myapp.data.StorageManager(context)
-                    storageManager.setLastActiveTrack(songToPlay?.title)
+                    storageManager.setLastActiveTrack(songToPlay)
                 }
                 
                 val storageManager = com.example.myapp.data.StorageManager(context)

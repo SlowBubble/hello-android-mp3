@@ -1,3 +1,32 @@
+# m5a ✓ - Canonical Track Identity Cleanup
+Design things more cleanly to try fixing bugs that keep recurring.
+
+## Root cause
+The app was using multiple identity sources for the same track at the same time:
+- `Song.id` (stable ID)
+- `song.uri` (stable file identity)
+- `song.title` (display label, not identity)
+- transient `currentSong` state in the ViewModel
+- persisted hidden/progress keys mixed across these values
+
+That meant one track could appear as "different" depending on which layer was checking it, especially when navigating away and back, auto-advancing, or restoring state after restart.
+
+## Fix
+We standardized around one canonical identity: `Song.id`.
+- `Song.id` is generated from the song's URI so the same file keeps the same identity across scans and app restarts.
+- Persistence and navigation now prefer `song.id` for hidden-track checks, progress lookups, and last-active-track restoration.
+- Compatibility fallback reads still accept older URI/title-based values for legacy saved data, but the app treats `Song.id` as the source of truth.
+
+## The recurring bugs this addresses
+- Sometimes, when a track is done, it fails to mark itself hidden and go to the next track: fixed by ensuring the current track and the next track are compared using the same canonical identity, rather than a stale title or temporary state.
+- When a track is playing and I click homepage, then click the same item again to return to the player: fixed by removing stale identity mismatches and treating a same-URI same-song navigation as a no-op when already playing.
+- Restart and restore behavior: last active track restoration now resolves against stable song identity instead of a fragile title string.
+
+## Result
+✅ No more drift between playing, hidden, and restored states
+✅ Safe same-track re-entry while already playing
+✅ Stable auto-advance and hidden-track transitions
+✅ Legacy saved data still reads correctly during migration
 
 # m4h ✓ - Home Button Playback Persistence
 

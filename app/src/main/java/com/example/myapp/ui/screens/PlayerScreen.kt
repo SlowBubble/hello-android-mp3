@@ -80,10 +80,10 @@ fun PlayerScreen(
         // Sort according to current sort mode, but without pinning the current track
         val sorted = when (sortIndex) {
             0 -> songs.sortedBy { track ->
-                storageManager.getTrackProgress(track.title)?.duration ?: estimateDurationLocal(track.fileSize)
+                storageManager.getTrackProgress(track)?.duration ?: estimateDurationLocal(track.fileSize)
             }
             1 -> songs.sortedByDescending { track ->
-                storageManager.getTrackProgress(track.title)?.duration ?: estimateDurationLocal(track.fileSize)
+                storageManager.getTrackProgress(track)?.duration ?: estimateDurationLocal(track.fileSize)
             }
             2 -> songs.sortedByDescending { it.dateModified }
             else -> songs.sortedBy { it.dateModified }
@@ -95,7 +95,10 @@ fun PlayerScreen(
         
         // Find next non-hidden track after current position
         return sorted.drop(currentIndex + 1).firstOrNull { track ->
-            !hiddenSet.contains(track.title)
+            val isHidden = hiddenSet.any { hidden ->
+                hidden == track.id.toString() || hidden == track.uri.toString() || hidden == track.title
+            }
+            !isHidden
         }
     }
 
@@ -106,11 +109,11 @@ fun PlayerScreen(
             val dur = service!!.getDuration()
             
             if (dur > 0) {
-                val progress = storageManager.getTrackProgress(song.title) 
+                val progress = storageManager.getTrackProgress(song)
                     ?: com.example.myapp.data.TrackProgress(song.title)
                 
                 val updated = progress.copy(currentTime = pos, duration = dur)
-                storageManager.saveTrackProgress(song.title, updated)
+                storageManager.saveTrackProgress(song, updated)
             }
         }
     }
@@ -146,7 +149,7 @@ fun PlayerScreen(
                                         saveProgress()
                                         
                                         // Hide current track
-                                        storageManager.hideTrack(song.title)
+                                        storageManager.hideTrack(song)
                                         
                                         // Find next track in sorted order
                                         val nextSong = getNextTrackInSortOrder()
@@ -224,7 +227,7 @@ fun PlayerScreen(
                     attempts++
                 }
 
-                val progress = storageManager.getTrackProgress(song.title)
+                val progress = storageManager.getTrackProgress(song)
                 if (progress != null && progress.currentTime > 0 && progress.duration > 0) {
                     // Seek to saved position before playing
                     service!!.seekTo(progress.currentTime)
@@ -274,6 +277,11 @@ fun PlayerScreen(
     DisposableEffect(Unit) {
         onDispose {
             saveProgress()
+            if (service != null && service!!.isPlaying()) {
+                playerViewModel.setCurrentSong(song)
+            } else {
+                playerViewModel.clearCurrentSong()
+            }
         }
     }
 
@@ -386,7 +394,7 @@ fun PlayerScreen(
                 // X button: hide current track and play next
                 Button(
                     onClick = {
-                        storageManager.hideTrack(song.title)
+                        storageManager.hideTrack(song)
                         
                         // Find next track in sorted order
                         val nextSong = getNextTrackInSortOrder()

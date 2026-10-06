@@ -3,7 +3,6 @@ package com.example.myapp.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -14,7 +13,7 @@ import kotlinx.serialization.json.Json
 class StorageManager(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("mp3_player_prefs", Context.MODE_PRIVATE)
-    
+
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {
@@ -29,8 +28,20 @@ class StorageManager(private val context: Context) {
         private const val MAX_FOLDER_HISTORY = 10
     }
 
-    // ============== Track Progress ==============
+    private fun songKey(song: Song): String = song.id.toString()
 
+    // ============== Track Progress ==============
+    fun saveTrackProgress(song: Song, progress: TrackProgress) {
+        saveTrackProgress(songKey(song), progress)
+    }
+
+    fun getTrackProgress(song: Song): TrackProgress? {
+        return getTrackProgress(songKey(song))
+            ?: getTrackProgress(song.uri.toString())
+            ?: getTrackProgress(song.title)
+    }
+
+    // Backwards-compatible raw-key lookup used by older code paths
     fun saveTrackProgress(trackName: String, progress: TrackProgress) {
         try {
             val json = json.encodeToString(progress)
@@ -52,6 +63,26 @@ class StorageManager(private val context: Context) {
     }
 
     // ============== Hidden Tracks ==============
+    fun hideTrack(song: Song) {
+        val hidden = getHiddenTracks().toMutableList()
+        listOf(songKey(song), song.uri.toString(), song.title).forEach { key ->
+            if (!hidden.contains(key)) hidden.add(key)
+        }
+        saveHiddenTracks(hidden)
+    }
+
+    fun unhideTrack(song: Song) {
+        val hidden = getHiddenTracks().toMutableList()
+        listOf(songKey(song), song.uri.toString(), song.title).forEach { key ->
+            hidden.remove(key)
+        }
+        saveHiddenTracks(hidden)
+    }
+
+    fun isTrackHidden(song: Song): Boolean {
+        val hidden = getHiddenTracks().toSet()
+        return listOf(songKey(song), song.uri.toString(), song.title).any { hidden.contains(it) }
+    }
 
     fun hideTrack(trackName: String) {
         val hidden = getHiddenTracks().toMutableList()
@@ -79,24 +110,21 @@ class StorageManager(private val context: Context) {
 
     private fun saveHiddenTracks(tracks: List<String>) {
         try {
-            val json = json.encodeToString(tracks)
+            val json = json.encodeToString(tracks.distinct())
             prefs.edit().putString(KEY_HIDDEN_TRACKS, json).apply()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    // ============== Sort Preference ==============
-
-    fun setSortIndex(index: Int) {
-        prefs.edit().putInt(KEY_SORT_INDEX, index).apply()
-    }
-
-    fun getSortIndex(): Int {
-        return prefs.getInt(KEY_SORT_INDEX, 0)
-    }
-
     // ============== Last Active Track ==============
+    fun setLastActiveTrack(song: Song?) {
+        if (song == null) {
+            prefs.edit().remove(KEY_LAST_ACTIVE_TRACK).apply()
+            return
+        }
+        prefs.edit().putString(KEY_LAST_ACTIVE_TRACK, songKey(song)).apply()
+    }
 
     fun setLastActiveTrack(trackName: String?) {
         if (trackName != null) {
@@ -106,12 +134,27 @@ class StorageManager(private val context: Context) {
         }
     }
 
-    fun getLastActiveTrack(): String? {
-        return prefs.getString(KEY_LAST_ACTIVE_TRACK, null)
+    fun getLastActiveTrack(): String? = prefs.getString(KEY_LAST_ACTIVE_TRACK, null)
+
+    fun getLastActiveTrackSong(songs: List<Song>): Song? {
+        val value = getLastActiveTrack() ?: return null
+        return songs.find { songKey(it) == value }
+            ?: songs.find { it.uri.toString() == value }
+            ?: songs.find { it.title == value }
     }
 
-    // ============== Folder URI ==============
+    fun clearLastActiveTrack() {
+        prefs.edit().remove(KEY_LAST_ACTIVE_TRACK).apply()
+    }
 
+    // ============== Sort Preference ==============
+    fun setSortIndex(index: Int) {
+        prefs.edit().putInt(KEY_SORT_INDEX, index).apply()
+    }
+
+    fun getSortIndex(): Int = prefs.getInt(KEY_SORT_INDEX, 0)
+
+    // ============== Folder URI ==============
     fun setFolderUri(folderUri: String?) {
         if (folderUri != null) {
             prefs.edit().putString(KEY_FOLDER_URI, folderUri).apply()
@@ -120,15 +163,9 @@ class StorageManager(private val context: Context) {
         }
     }
 
-    fun getFolderUri(): String? {
-        return prefs.getString(KEY_FOLDER_URI, null)
-    }
+    fun getFolderUri(): String? = prefs.getString(KEY_FOLDER_URI, null)
 
     // ============== Folder History ==============
-
-    /**
-     * Returns the ordered list of previously opened folder URIs (most recent first).
-     */
     fun getFolderHistory(): List<String> {
         return try {
             val stored = prefs.getString(KEY_FOLDER_HISTORY, "[]") ?: "[]"
@@ -139,14 +176,10 @@ class StorageManager(private val context: Context) {
         }
     }
 
-    /**
-     * Adds a folder URI to the front of the history list (deduplicating and capping at MAX).
-     * Also resets the current folder index to 0 (the newly added folder is now "current").
-     */
     fun addFolderToHistory(folderUri: String) {
         val history = getFolderHistory().toMutableList()
-        history.remove(folderUri)          // remove duplicate if present
-        history.add(0, folderUri)          // prepend as most recent
+        history.remove(folderUri)
+        history.add(0, folderUri)
         if (history.size > MAX_FOLDER_HISTORY) history.removeAt(history.size - 1)
         try {
             val stored = json.encodeToString(history)
@@ -159,18 +192,12 @@ class StorageManager(private val context: Context) {
         }
     }
 
-    fun getCurrentFolderIndex(): Int {
-        return prefs.getInt(KEY_CURRENT_FOLDER_INDEX, 0)
-    }
+    fun getCurrentFolderIndex(): Int = prefs.getInt(KEY_CURRENT_FOLDER_INDEX, 0)
 
     fun setCurrentFolderIndex(index: Int) {
         prefs.edit().putInt(KEY_CURRENT_FOLDER_INDEX, index).apply()
     }
 
-    /**
-     * Returns the URI for the currently selected folder (by index into history),
-     * falling back to the legacy single folder_uri key for backwards compatibility.
-     */
     fun getCurrentFolderUri(): String? {
         val history = getFolderHistory()
         if (history.isNotEmpty()) {
@@ -180,28 +207,15 @@ class StorageManager(private val context: Context) {
         return getFolderUri()
     }
 
-    /**
-     * Extract folder name from a URI path.
-     * For example: "content://com.android.externalstorage.documents/tree/primary%3AMusic%2FPlaylists"
-     * might return "Playlists"
-     */
     private fun extractFolderName(uri: String): String? {
         return try {
-            // Decode the entire URI string first to handle encoded segments
             val decoded = java.net.URLDecoder.decode(uri, "UTF-8")
-            
-            // Look for the tree document ID which contains the folder structure
-            // Format: primary:Music/Playlists or similar
             val treeDocIdPattern = "tree/([^/]+)".toRegex()
             val match = treeDocIdPattern.find(decoded)
-            
             if (match != null) {
                 val treeDocId = match.groupValues[1]
-                // Split by colon to remove "primary:" prefix
                 val parts = treeDocId.split(":")
                 val pathPart = if (parts.size > 1) parts[1] else treeDocId
-                
-                // Get the last folder name from the path
                 val folderParts = pathPart.split("/")
                 val lastFolder = folderParts.lastOrNull { it.isNotEmpty() }
                 lastFolder?.takeIf { it.isNotEmpty() }
@@ -211,22 +225,11 @@ class StorageManager(private val context: Context) {
         }
     }
 
-    /**
-     * Get display name for a folder URI.
-     * Returns either the extracted folder name or a generic "Folder N" label.
-     */
     fun getFolderDisplayName(uri: String, index: Int): String {
         val extracted = extractFolderName(uri)
-        return if (!extracted.isNullOrEmpty()) {
-            extracted
-        } else {
-            "Folder ${index + 1}"
-        }
+        return if (!extracted.isNullOrEmpty()) extracted else "Folder ${index + 1}"
     }
 
-    /**
-     * Get the display name of the current folder.
-     */
     fun getCurrentFolderDisplayName(): String {
         val history = getFolderHistory()
         if (history.isNotEmpty()) {
@@ -236,22 +239,13 @@ class StorageManager(private val context: Context) {
         return "Folder"
     }
 
-    /**
-     * Enable/disable "All Folders" mode (shows tracks from all folders combined).
-     */
     fun setShowAllFolders(showAll: Boolean) {
         prefs.edit().putBoolean(KEY_SHOW_ALL_FOLDERS, showAll).apply()
     }
 
-    /**
-     * Check if "All Folders" mode is enabled.
-     */
-    fun isShowAllFolders(): Boolean {
-        return prefs.getBoolean(KEY_SHOW_ALL_FOLDERS, false)
-    }
+    fun isShowAllFolders(): Boolean = prefs.getBoolean(KEY_SHOW_ALL_FOLDERS, false)
 
     // ============== Playback Statistics ==============
-
     fun updateLastPlayedDate(trackName: String) {
         val progress = getTrackProgress(trackName) ?: TrackProgress(trackName)
         val updated = progress.copy(
@@ -264,17 +258,13 @@ class StorageManager(private val context: Context) {
 
     fun addListeningTime(trackName: String, timeMs: Long) {
         val progress = getTrackProgress(trackName) ?: TrackProgress(trackName)
-        val updated = progress.copy(
-            totalListeningTime = progress.totalListeningTime + timeMs
-        )
+        val updated = progress.copy(totalListeningTime = progress.totalListeningTime + timeMs)
         saveTrackProgress(trackName, updated)
     }
 
     fun clearAll() {
         prefs.edit().clear().apply()
     }
-
-    // ============== File Deletion ==============
 
     fun deleteTrack(trackTitle: String, trackUri: android.net.Uri) {
         try {
