@@ -400,7 +400,7 @@ fun PlayerScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(72.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -419,7 +419,7 @@ fun PlayerScreen(
                         }
                     },
                     modifier = Modifier
-                        .size(48.dp),
+                        .size(72.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White.copy(alpha = 0.15f)
                     ),
@@ -437,7 +437,7 @@ fun PlayerScreen(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(72.dp)
                         .padding(horizontal = 8.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White.copy(alpha = 0.15f)
@@ -453,7 +453,7 @@ fun PlayerScreen(
                         moveToNextTrack(hideCurrent = true)
                     },
                     modifier = Modifier
-                        .size(48.dp),
+                        .size(72.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFFF4444).copy(alpha = 0.3f)
                     ),
@@ -476,7 +476,7 @@ fun PlayerScreen(
                 Button(
                     onClick = { service?.let { onRewind45(it) } },
                     modifier = Modifier
-                        .width(60.dp)
+                        .width(90.dp)
                         .fillMaxHeight(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White.copy(alpha = 0.15f)
@@ -554,7 +554,7 @@ fun PlayerScreen(
                 Button(
                     onClick = { service?.let { onFastForward45(it) } },
                     modifier = Modifier
-                        .width(60.dp)
+                        .width(90.dp)
                         .fillMaxHeight(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White.copy(alpha = 0.15f)

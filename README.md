@@ -1,4 +1,6 @@
 # m5d
+Bug 1: when I press next and then press on home page, the demarcation between the pinned track and the first track in the sorted list is gone
+
 # m5c
 - Make the rewind and forward 45s buttons 1.5x in width
   - this may also affect the top row of buttons, which is okay (i.e. the X button will be wider also)
