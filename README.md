@@ -1,7 +1,30 @@
-# m6a
-still random app crashes despite our spaghetti code cleanup
-E.g.
-- When I press "x", it correctly move to the next track, but then if I press on homepage and then press on the playing track's item, it just crash
+# m6a ✓ - Stale Hidden Tracks State Crash Fix
+
+## Problem
+After pressing "X" to hide current track and advance to next, then returning to homepage and clicking the now-playing track item → **CRASH**
+
+## Root Cause
+`PlayerScreen.getVisibleQueue()` was using a stale `hiddenTracks` parameter instead of reading the current state from `StorageManager`. When `storageManager.hideTrack()` was called, the parameter didn't update, so subsequent queue calculations included already-hidden tracks, causing state mismatch and navigation crashes.
+
+## Solution
+Modified `getVisibleQueue()` to always read current hidden tracks directly from StorageManager:
+```kotlin
+fun getVisibleQueue(): List<Song> {
+    val activeSongId = currentVmSongId ?: song.id
+    val currentHiddenTracks = storageManager.getHiddenTracks()  // Read current state, not stale parameter
+    return QueueUtils.buildVisibleQueue(
+        songs = songs,
+        sortMode = storageManager.getSortIndex(),
+        hiddenTrackKeys = currentHiddenTracks,
+        currentSongId = activeSongId
+    )
+}
+```
+
+## Result
+✅ Queue state always matches StorageManager truth
+✅ No crashes when navigating after hiding tracks
+✅ Stale parameter removed from critical path
 
 # m5g
 - sorting seems broken (1 video with 0:10/24:54 comes before one with 0:00/15:09)

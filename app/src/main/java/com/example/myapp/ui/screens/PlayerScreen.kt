@@ -69,10 +69,12 @@ fun PlayerScreen(
     // Helper function to get the next track in sorted order (ignoring the pinned track)
     fun getVisibleQueue(): List<Song> {
         val activeSongId = currentVmSongId ?: song.id
+        // Always read current hidden tracks from StorageManager, not the stale parameter
+        val currentHiddenTracks = storageManager.getHiddenTracks()
         return QueueUtils.buildVisibleQueue(
             songs = songs,
             sortMode = storageManager.getSortIndex(),
-            hiddenTrackKeys = hiddenTracks,
+            hiddenTrackKeys = currentHiddenTracks,
             currentSongId = activeSongId
         )
     }
