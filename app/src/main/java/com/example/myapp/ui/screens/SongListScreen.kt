@@ -168,12 +168,22 @@ fun SongListScreen(
     }
 
     val sortedAndFiltered = remember(songs, sortMode, hiddenTracks, showHidden, currentSongId) {
-        val baseQueue = QueueUtils.buildVisibleQueue(
-            songs = songs,
-            sortMode = sortMode,
-            hiddenTrackKeys = hiddenTracks,
-            currentSongId = currentSongId
-        )
+        val baseQueue = if (showHidden) {
+            QueueUtils.buildVisibleQueue(
+                songs = songs,
+                sortMode = sortMode,
+                hiddenTrackKeys = emptyList(),
+                currentSongId = null
+            )
+        } else {
+            QueueUtils.buildVisibleQueue(
+                songs = songs,
+                sortMode = sortMode,
+                hiddenTrackKeys = hiddenTracks,
+                currentSongId = currentSongId
+            )
+        }
+
         if (showHidden) {
             baseQueue.filter { storageManager.isTrackHidden(it) }
         } else {

@@ -1,3 +1,25 @@
+# m5g
+- sorting seems broken (1 video with 0:10/24:54 comes before one with 0:00/15:09)
+
+# m5f
+Bugs:
+- I don't see any hidden tracks even though I have a bunch of tracks I have press "X" on (either on home page or player page)
+- Sometimes clicking on a track on the home page crashes after I do some other navigations
+  - I thought the single source of truth should have avoided these issues
+- Sometimes, tracks that are done or from pressing "X" are still in the homepage is that of hidden.
+
+## Root cause
+The hidden-state bug was caused by split identity logic, not by a single canonical queue.
+- `X` stored a hidden entry in `StorageManager`, but the visible list was rebuilt separately in `QueueUtils.buildVisibleQueue(...)` and in `SongListScreen`.
+- Hidden matching was mixed across `song.id`, `song.uri`, `song.title`, and legacy numeric values instead of one consistent identity rule.
+- The hidden-page list was also derived from an already-filtered queue, so it could hide the actual hidden set rather than showing the canonical hidden list.
+- After navigation or recomposition, stale song objects and recomputed lists could disagree about whether a track was already hidden, so tracks marked hidden via `X` could still appear on Home.
+
+## Fix
+- Centralize hidden visibility checks in the same canonical queue helper used by the home and hidden screens.
+- Match hidden entries using one consistent track identity rule when comparing persisted hidden keys to current songs.
+- Derive the hidden list from the canonical unfiltered queue, then filter to hidden items; derive the home list from the canonical filtered queue.
+- Keep legacy hidden keys compatible so older saved values still match correctly.
 
 # m5e - Single-Source-of-Truth Cleanup
 

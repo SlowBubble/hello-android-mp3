@@ -30,6 +30,15 @@ class StorageManager(private val context: Context) {
 
     private fun songKey(song: Song): String = song.id.toString()
 
+    private fun matchesHiddenValue(song: Song, value: String): Boolean {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return false
+        return song.id.toString() == trimmed ||
+            song.uri.toString() == trimmed ||
+            song.title == trimmed ||
+            trimmed.toLongOrNull() == song.id
+    }
+
     private fun saveTrackProgressByKey(trackKey: String, progress: TrackProgress) {
         try {
             val json = json.encodeToString(progress)
@@ -78,7 +87,7 @@ class StorageManager(private val context: Context) {
     }
 
     fun isTrackHidden(song: Song): Boolean {
-        return getHiddenTracks().contains(songKey(song))
+        return getHiddenTracks().any { matchesHiddenValue(song, it) }
     }
 
     fun getHiddenTracks(): List<String> {

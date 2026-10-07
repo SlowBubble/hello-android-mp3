@@ -15,17 +15,19 @@ object QueueUtils {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()
-        val hiddenNumericIds = hiddenValues.mapNotNull { it.toLongOrNull() }.toSet()
         val effectiveSortMode = SortMode.values()[sortMode.coerceIn(0, SortMode.values().size - 1)]
 
+        fun matchesSongIdentity(song: Song, raw: String): Boolean {
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) return false
+            return song.id.toString() == trimmed ||
+                song.uri.toString() == trimmed ||
+                song.title == trimmed ||
+                trimmed.toLongOrNull() == song.id
+        }
+
         fun isHidden(song: Song): Boolean {
-            return hiddenValues.any { hidden ->
-                hidden == song.id.toString() ||
-                    hidden == song.uri.toString() ||
-                    hidden == song.title ||
-                    hidden.toLongOrNull() == song.id ||
-                    hiddenNumericIds.contains(song.id)
-            }
+            return hiddenValues.any { matchesSongIdentity(song, it) }
         }
 
         val sorted = when (effectiveSortMode) {
@@ -50,9 +52,19 @@ object QueueUtils {
         }
     }
 
+    fun findSongIndex(queue: List<Song>, song: Song?): Int {
+        if (song == null) return -1
+        return queue.indexOfFirst { it.id == song.id || it.uri == song.uri }
+    }
+
+    fun findSongIndexById(queue: List<Song>, songId: Long?): Int {
+        if (songId == null) return -1
+        return queue.indexOfFirst { it.id == songId }
+    }
+
     fun nextTrack(queue: List<Song>, currentSongId: Long?): Song? {
         if (queue.isEmpty()) return null
-        val currentIndex = queue.indexOfFirst { it.id == currentSongId }
+        val currentIndex = findSongIndexById(queue, currentSongId)
         return if (currentIndex >= 0) {
             queue.getOrNull(currentIndex + 1)
                 ?: queue.firstOrNull { it.id != currentSongId }
