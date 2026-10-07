@@ -502,3 +502,35 @@ Prevent redundant audio reloads when navigating back to the player with the same
 2. Pass the shared `PlayerViewModel` from `MainActivity` to `PlayerScreen` (don't create a new instance)
 3. Guard the load effect: if `lastLoadedSongId == currentSong.id && service.isPlaying()`, return early
 4. Result: same song, playing → navigate without reload; same song, paused or different song → load and play normally
+
+# m5g ✓ - Sort Order Fix
+
+## Problem
+The app’s shortest/longest sort order was inconsistent and could place a track with a longer displayed duration ahead of a shorter one.
+
+Example reported in the UI:
+- `0:10 / 24:54` appearing before `0:00 / 15:09`
+
+## Root cause
+The sort path still had a stale fallback in the queue logic:
+- the canonical visible queue was using `effectiveDuration(...)` in some paths,
+- but older comparisons and fallback branches could still end up evaluating raw file size instead of a track’s true duration,
+- and that meant the sorting heuristic was not always comparing the same duration units.
+
+This was effectively leftover “half-migrated” logic: the app had moved to duration-based sorting in principle, but not every comparator was using the same canonical duration source.
+
+## Fix
+- Centralized duration choice behind a single helper: `QueueUtils.effectiveDuration(song, savedDuration)`
+- The helper prefers:
+  1. saved duration from progress
+  2. `song.duration`
+  3. `estimateDuration(song.fileSize)` as a fallback estimate only
+- Updated the visible queue sorting to use that shared duration helper for both shortest and longest orderings.
+- Cleaned up duplicate old duration logic in the list UI so there was only one canonical duration interpretation.
+
+## Result
+✅ Shortest/longest sorts now compare the same effective duration across the app
+✅ A track with a longer actual duration no longer jumps ahead of a shorter one
+✅ The fallback estimate is still available when needed, but it is no longer the primary sort source
+
+# m5f

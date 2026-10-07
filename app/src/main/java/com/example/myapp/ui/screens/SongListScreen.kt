@@ -110,8 +110,8 @@ private fun shouldAddDemarcation(
 
     return when (sortMode) {
         SortMode.SHORTEST, SortMode.LONGEST -> {
-            val prevDuration = prevProgress?.duration ?: estimateDuration(prevSong.fileSize)
-            val currentDuration = currentProgress?.duration ?: estimateDuration(currentSong.fileSize)
+            val prevDuration = QueueUtils.effectiveDuration(prevSong, prevProgress?.duration)
+            val currentDuration = QueueUtils.effectiveDuration(currentSong, currentProgress?.duration)
             val prevBucket = getDurationBucket(prevDuration)
             val currentBucket = getDurationBucket(currentDuration)
             prevBucket != currentBucket
@@ -132,7 +132,7 @@ private fun getDemarcationLabel(
 ): String? {
     return when (sortMode) {
         SortMode.SHORTEST, SortMode.LONGEST -> {
-            val duration = progress?.duration ?: estimateDuration(song.fileSize)
+            val duration = QueueUtils.effectiveDuration(song, progress?.duration)
             getDurationBucketLabel(duration)
         }
         SortMode.NEWEST, SortMode.OLDEST -> {
@@ -401,17 +401,14 @@ fun SongListScreen(
                     when (item) {
                         is SongListItem.SongItem -> {
                             val song = item.song
-                            // Calculate max duration across all visible songs using actual saved durations
                             val maxDurationMs = visibleSongs.maxOfOrNull { s ->
-                                storageManager.getTrackProgress(s)?.duration?.takeIf { it > 0 }
-                                    ?: estimateDuration(s.fileSize)
+                                QueueUtils.effectiveDuration(s, storageManager.getTrackProgress(s)?.duration)
                             } ?: 1L
                             
                             SongListItemComposable(
                                 song = song,
                                 isActive = song.id == currentSongId,
                                 progress = storageManager.getTrackProgress(song),
-                                maxFileSize = songs.maxOf { it.fileSize },
                                 isHidden = storageManager.isTrackHidden(song),
                                 onSongClick = { 
                                     // M4e: Auto-unhide if playing from hidden page
@@ -476,7 +473,6 @@ fun SongListItemComposable(
     song: Song,
     isActive: Boolean,
     progress: com.example.myapp.data.TrackProgress?,
-    maxFileSize: Long,
     isHidden: Boolean,
     onSongClick: () -> Unit,
     onHideClick: () -> Unit,
@@ -518,7 +514,7 @@ fun SongListItemComposable(
             val durationText = if (progress?.duration != null && progress.duration > 0) {
                 formatTime(progress.duration)
             } else {
-                formatTime(estimateDuration(song.fileSize))
+                formatTime(QueueUtils.effectiveDuration(song, null))
             }
 
             // Current time / total time display if track has been played
@@ -540,9 +536,7 @@ fun SongListItemComposable(
                     .fillMaxWidth()
                     .height(6.dp)
             ) {
-                // Use actual saved duration if available, otherwise estimate
-                val trackDuration = progress?.duration?.takeIf { it > 0 } 
-                    ?: estimateDuration(song.fileSize)
+                val trackDuration = QueueUtils.effectiveDuration(song, progress?.duration)
                 
                 if (maxDuration > 0 && trackDuration > 0) {
                     val grayWidth = (trackDuration.toFloat() / maxDuration.toFloat()) * 100
@@ -637,32 +631,6 @@ fun SongListItemComposable(
     }
 }
 
-private fun List<Song>.sortedAccordingTo(
-    sortMode: Int,
-    storageManager: StorageManager,
-    currentSongId: Long?
-): List<Song> {
-    val currentSong = this.find { it.id == currentSongId }
-    
-    val sorted = when (SortMode.values()[sortMode]) {
-        SortMode.SHORTEST -> this.sortedBy { song ->
-            storageManager.getTrackProgress(song)?.duration ?: estimateDuration(song.fileSize)
-        }
-        SortMode.LONGEST -> this.sortedByDescending { song ->
-            storageManager.getTrackProgress(song)?.duration ?: estimateDuration(song.fileSize)
-        }
-        SortMode.NEWEST -> this.sortedByDescending { it.dateModified }
-        SortMode.OLDEST -> this.sortedBy { it.dateModified }
-    }
-
-    // Pin current song to top
-    return if (currentSong != null) {
-        listOf(currentSong) + sorted.filter { it.id != currentSong.id }
-    } else {
-        sorted
-    }
-}
-
 private fun formatTime(ms: Long): String {
     val seconds = (ms / 1000) % 60
     val minutes = (ms / (1000 * 60)) % 60
@@ -673,13 +641,4 @@ private fun formatTime(ms: Long): String {
     } else {
         String.format("%d:%02d", minutes, seconds)
     }
-}
-
-// Estimate duration from file size (assuming average bitrate of 128 kbps)
-// This is a reasonable estimate for typical MP3 files
-private fun estimateDuration(bytes: Long): Long {
-    if (bytes <= 0) return 0
-    // Bitrate: 128 kbps = 128 * 1000 / 8 = 16000 bytes per second
-    val BYTES_PER_SECOND = 16000L
-    return (bytes / BYTES_PER_SECOND) * 1000 // Return in milliseconds
 }

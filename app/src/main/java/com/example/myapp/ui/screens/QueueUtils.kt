@@ -3,6 +3,19 @@ package com.example.myapp.ui.screens
 import com.example.myapp.data.Song
 
 object QueueUtils {
+    private const val BYTES_PER_SECOND = 16000L
+
+    fun effectiveDuration(song: Song, savedDuration: Long? = null): Long {
+        return savedDuration?.takeIf { it > 0 }
+            ?: song.duration.takeIf { it > 0 }
+            ?: estimateDuration(song.fileSize)
+    }
+
+    private fun estimateDuration(bytes: Long): Long {
+        if (bytes <= 0) return 0L
+        return (bytes / BYTES_PER_SECOND) * 1000L
+    }
+
     fun buildVisibleQueue(
         songs: List<Song>,
         sortMode: Int,
@@ -31,12 +44,8 @@ object QueueUtils {
         }
 
         val sorted = when (effectiveSortMode) {
-            SortMode.SHORTEST -> songs.sortedBy { track ->
-                track.duration.takeIf { it > 0 } ?: track.fileSize
-            }
-            SortMode.LONGEST -> songs.sortedByDescending { track ->
-                track.duration.takeIf { it > 0 } ?: track.fileSize
-            }
+            SortMode.SHORTEST -> songs.sortedBy { effectiveDuration(it) }
+            SortMode.LONGEST -> songs.sortedByDescending { effectiveDuration(it) }
             SortMode.NEWEST -> songs.sortedByDescending { it.dateModified }
             SortMode.OLDEST -> songs.sortedBy { it.dateModified }
         }

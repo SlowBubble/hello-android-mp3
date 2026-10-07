@@ -1,11 +1,39 @@
 package com.example.myapp.data
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
 
 class SongScanner(private val context: Context) {
+
+    private fun extractDurationMillis(uri: Uri): Long {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            val fd = context.contentResolver.openFileDescriptor(uri, "r")
+            if (fd != null) {
+                try {
+                    retriever.setDataSource(fd.fileDescriptor)
+                    val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    duration?.toLongOrNull() ?: 0L
+                } finally {
+                    fd.close()
+                }
+            } else {
+                0L
+            }
+        } catch (e: Exception) {
+            Log.w("SongScanner", "Could not read duration for $uri: ${e.message}", e)
+            0L
+        } finally {
+            try {
+                retriever.release()
+            } catch (_: Exception) {
+                // no-op
+            }
+        }
+    }
 
     fun scanFolderForMp3s(folderUri: String): List<Song> {
         val result = mutableListOf<Song>()
@@ -52,18 +80,19 @@ class SongScanner(private val context: Context) {
                     // Build the actual content URI ExoPlayer can open
                     val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                     val title = name.removeSuffix(".mp3").removeSuffix(".MP3")
+                    val duration = extractDurationMillis(docUri)
                     result.add(
                         Song(
                             id = Song.generateStableId(docUri),
                             title = title,
                             artist = "Unknown Artist",
                             uri = docUri,
-                            duration = 0L,
+                            duration = duration,
                             fileSize = fileSize,
                             dateModified = lastModified
                         )
                     )
-                    Log.d("SongScanner", "Added MP3: $title → $docUri")
+                    Log.d("SongScanner", "Added MP3: $title → $docUri (duration=${duration}ms)")
                 }
             }
         }
