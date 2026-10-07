@@ -16,32 +16,31 @@ object QueueUtils {
         return (bytes / BYTES_PER_SECOND) * 1000L
     }
 
-    fun buildVisibleQueue(
-        songs: List<Song>,
-        sortMode: Int,
-        hiddenTrackKeys: Iterable<String> = emptyList(),
-        currentSongId: Long? = null
-    ): List<Song> {
-        if (songs.isEmpty()) return emptyList()
+    fun matchesSongIdentity(song: Song, raw: String): Boolean {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return false
+        return song.id.toString() == trimmed ||
+            trimmed.toLongOrNull() == song.id ||
+            song.uri.toString() == trimmed
+    }
 
+    fun isSongHidden(song: Song, hiddenTrackKeys: Iterable<String>): Boolean {
         val hiddenValues = hiddenTrackKeys
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()
+        if (hiddenValues.isEmpty()) return false
+        return hiddenValues.any { matchesSongIdentity(song, it) }
+    }
+
+    fun buildHiddenQueue(
+        songs: List<Song>,
+        sortMode: Int,
+        hiddenTrackKeys: Iterable<String> = emptyList()
+    ): List<Song> {
+        if (songs.isEmpty()) return emptyList()
+
         val effectiveSortMode = SortMode.values()[sortMode.coerceIn(0, SortMode.values().size - 1)]
-
-        fun matchesSongIdentity(song: Song, raw: String): Boolean {
-            val trimmed = raw.trim()
-            if (trimmed.isEmpty()) return false
-            return song.id.toString() == trimmed ||
-                song.uri.toString() == trimmed ||
-                song.title == trimmed ||
-                trimmed.toLongOrNull() == song.id
-        }
-
-        fun isHidden(song: Song): Boolean {
-            return hiddenValues.any { matchesSongIdentity(song, it) }
-        }
 
         val sorted = when (effectiveSortMode) {
             SortMode.SHORTEST -> songs.sortedBy { effectiveDuration(it) }
@@ -50,7 +49,27 @@ object QueueUtils {
             SortMode.OLDEST -> songs.sortedBy { it.dateModified }
         }
 
-        val visible = sorted.filterNot(::isHidden)
+        return sorted.filter { isSongHidden(it, hiddenTrackKeys) }
+    }
+
+    fun buildVisibleQueue(
+        songs: List<Song>,
+        sortMode: Int,
+        hiddenTrackKeys: Iterable<String> = emptyList(),
+        currentSongId: Long? = null
+    ): List<Song> {
+        if (songs.isEmpty()) return emptyList()
+
+        val effectiveSortMode = SortMode.values()[sortMode.coerceIn(0, SortMode.values().size - 1)]
+
+        val sorted = when (effectiveSortMode) {
+            SortMode.SHORTEST -> songs.sortedBy { effectiveDuration(it) }
+            SortMode.LONGEST -> songs.sortedByDescending { effectiveDuration(it) }
+            SortMode.NEWEST -> songs.sortedByDescending { it.dateModified }
+            SortMode.OLDEST -> songs.sortedBy { it.dateModified }
+        }
+
+        val visible = sorted.filterNot { isSongHidden(it, hiddenTrackKeys) }
         if (currentSongId == null) return visible
 
         val pinned = visible.firstOrNull { it.id == currentSongId }

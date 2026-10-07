@@ -533,4 +533,86 @@ This was effectively leftover “half-migrated” logic: the app had moved to du
 ✅ A track with a longer actual duration no longer jumps ahead of a shorter one
 ✅ The fallback estimate is still available when needed, but it is no longer the primary sort source
 
-# m5f
+# m5h - Whole-App Cleanup
+
+This is the broader cleanup we still need across the app, even after fixing the sort regression in m5g.
+
+## Why this still matters
+The app works in pieces, but it still has too many places that independently decide:
+- what a song is
+- whether a track is hidden
+- what the active queue is
+- what “current song” means
+- what duration to use for sorting or display
+- whether a screen should be treated as stale or authoritative
+
+That duplication is why bugs keep reappearing in slightly different forms: hidden tracks, sort order, steals of stale state, and navigation races.
+
+## The cleanup we want
+
+### 1. One canonical queue builder
+There should be exactly one place that builds the effective list shown on Home and Hidden.
+- `buildVisibleQueue(...)` should be the canonical source of truth
+- home page and hidden page should not each re-derive their own filtered/sorted list
+- sorting, hidden filtering, and pinned current song should all be derived from the same queue output
+
+### 2. One canonical song identity
+The app should treat one stable identity as authoritative for all song matching.
+- prefer `Song.id` for queue and persisted state
+- use `song.uri` only as the stable underlying source when needed for migration or compatibility
+  - Actually, don't worry about migration or compatibility; but id should be uri, so just use id unless you see another compelling reason to use uri
+- stop mixing `id`, `uri`, `title`, and transient screen state when checking whether two items are the same track
+
+### 3. One canonical current-song state
+The app should not keep multiple copies of “what is playing/selected.”
+- current song should be represented by a single canonical id or stable reference
+- the player screen, list screen, view model, and service should all read from the same source
+- stale screen-local state should never overwrite a newer canonical state after navigation or skip events
+
+### 4. One canonical duration policy
+Every part of the app should agree on how duration is chosen.
+- real metadata duration first
+- saved duration second
+- file-size estimate only as a fallback when necessary
+- no more ad hoc “sometimes use file size, sometimes use progress, sometimes use actual song.duration” logic
+
+### 5. One canonical persistence boundary
+Hidden tracks, progress, and resumed playback should all be keyed and read through a single consistent rule.
+- keep backward-compatible migration reads for old keys
+- write only the canonical format going forward
+- never let a UI layer silently treat legacy keys as separate identity sources
+
+### 6. One canonical navigation contract
+Screen-to-screen transitions should be based on the same queue state, not local recomputation.
+- “next” should be derived from the displayed queue
+- “home” should not invent a second list
+- “same song re-entry” should be a no-op when already playing the same canonical track instead of reloading media
+
+### 7. One canonical service boundary
+The player service should own playback state; UI should not keep competing state machines.
+- service is responsible for loading media, playback position, and state changes
+- UI reads service state and queue state, but should not hold separate copies that may drift
+- time-based and stale callback logic should be replaced by event-driven state whenever possible
+
+## What is still duplicated today
+These are the main places where the app still has duplicated truth:
+- `SongListScreen` builds part of the visible list and partially re-derives sort or hidden state
+- `QueueUtils` builds the effective queue, but some callers still validate lists or matching separately
+- `StorageManager` stores hidden/progress state using legacy compatibility logic, plus callers still re-check identities ad hoc
+- `PlayerScreen` and `PlayerViewModel` both keep notions of the active song and navigation state
+- duration logic is still visible in multiple places depending on whether the code path is list UI, queue helper, or player display
+
+## Target design
+The app should behave like this:
+1. Build one canonical queue from `songs + sortMode + hiddenTracks + currentSongId`
+2. Resolve all identity checks against the canonical song identity
+3. Render Home and Hidden from that queue output only
+4. Use the canonical queue to determine next/prev state and divider boundaries
+5. Persist only canonical keys and migrate old values on read
+6. Keep the player service as the single playback source of truth
+
+## Guiding rule
+If a value can be derived from the canonical queue or canonical song state, it should not be recreated in a screen, a view model, or a storage layer.
+
+That is the real cleanup we still need across the whole app.
+

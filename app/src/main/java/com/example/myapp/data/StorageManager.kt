@@ -3,6 +3,7 @@ package com.example.myapp.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.example.myapp.ui.screens.QueueUtils
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -33,10 +34,10 @@ class StorageManager(private val context: Context) {
     private fun matchesHiddenValue(song: Song, value: String): Boolean {
         val trimmed = value.trim()
         if (trimmed.isEmpty()) return false
-        return song.id.toString() == trimmed ||
-            song.uri.toString() == trimmed ||
-            song.title == trimmed ||
-            trimmed.toLongOrNull() == song.id
+
+        // Canonical storage is always the stable song id, but keep a narrow compatibility
+        // fallback for older persisted values that used URI/title/legacy numeric ids.
+        return QueueUtils.matchesSongIdentity(song, trimmed)
     }
 
     private fun saveTrackProgressByKey(trackKey: String, progress: TrackProgress) {
@@ -102,7 +103,7 @@ class StorageManager(private val context: Context) {
 
     private fun saveHiddenTracks(tracks: List<String>) {
         try {
-            val json = json.encodeToString(tracks.distinct())
+            val json = json.encodeToString(tracks.map { it.trim() }.filter { it.isNotEmpty() }.distinct())
             prefs.edit().putString(KEY_HIDDEN_TRACKS, json).apply()
         } catch (e: Exception) {
             e.printStackTrace()

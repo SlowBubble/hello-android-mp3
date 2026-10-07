@@ -155,8 +155,8 @@ fun SongListScreen(
 ) {
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
-    
-    var sortMode by remember { 
+
+    var sortMode by remember {
         mutableIntStateOf(storageManager.getSortIndex())
     }
     var showHidden by remember { mutableStateOf(false) }
@@ -167,29 +167,24 @@ fun SongListScreen(
         storageManager.getHiddenTracks()
     }
 
-    val sortedAndFiltered = remember(songs, sortMode, hiddenTracks, showHidden, currentSongId) {
-        val baseQueue = if (showHidden) {
-            QueueUtils.buildVisibleQueue(
-                songs = songs,
-                sortMode = sortMode,
-                hiddenTrackKeys = emptyList(),
-                currentSongId = null
-            )
-        } else {
-            QueueUtils.buildVisibleQueue(
-                songs = songs,
-                sortMode = sortMode,
-                hiddenTrackKeys = hiddenTracks,
-                currentSongId = currentSongId
-            )
-        }
-
-        if (showHidden) {
-            baseQueue.filter { storageManager.isTrackHidden(it) }
-        } else {
-            baseQueue.filterNot { storageManager.isTrackHidden(it) }
-        }
+    val visibleQueue = remember(songs, sortMode, hiddenTracks, currentSongId) {
+        QueueUtils.buildVisibleQueue(
+            songs = songs,
+            sortMode = sortMode,
+            hiddenTrackKeys = hiddenTracks,
+            currentSongId = currentSongId
+        )
     }
+
+    val hiddenQueue = remember(songs, sortMode, hiddenTracks) {
+        QueueUtils.buildHiddenQueue(
+            songs = songs,
+            sortMode = sortMode,
+            hiddenTrackKeys = hiddenTracks
+        )
+    }
+
+    val sortedAndFiltered = if (showHidden) hiddenQueue else visibleQueue
 
     // M4e: Auto-reset tracks that are within 25 seconds of the end
     val visibleSongs = remember(sortedAndFiltered, visibleCount) {
@@ -404,19 +399,19 @@ fun SongListScreen(
                             val maxDurationMs = visibleSongs.maxOfOrNull { s ->
                                 QueueUtils.effectiveDuration(s, storageManager.getTrackProgress(s)?.duration)
                             } ?: 1L
-                            
+
                             SongListItemComposable(
                                 song = song,
                                 isActive = song.id == currentSongId,
                                 progress = storageManager.getTrackProgress(song),
                                 isHidden = storageManager.isTrackHidden(song),
-                                onSongClick = { 
+                                onSongClick = {
                                     // M4e: Auto-unhide if playing from hidden page
                                     if (showHidden) {
                                         storageManager.unhideTrack(song)
                                         hiddenTracksRefresh++
                                     }
-                                    onSongClick(song) 
+                                    onSongClick(song)
                                 },
                                 onHideClick = {
                                     storageManager.hideTrack(song)
@@ -537,10 +532,10 @@ fun SongListItemComposable(
                     .height(6.dp)
             ) {
                 val trackDuration = QueueUtils.effectiveDuration(song, progress?.duration)
-                
+
                 if (maxDuration > 0 && trackDuration > 0) {
                     val grayWidth = (trackDuration.toFloat() / maxDuration.toFloat()) * 100
-                    
+
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
@@ -635,7 +630,7 @@ private fun formatTime(ms: Long): String {
     val seconds = (ms / 1000) % 60
     val minutes = (ms / (1000 * 60)) % 60
     val hours = ms / (1000 * 60 * 60)
-    
+
     return if (hours > 0) {
         String.format("%d:%02d:%02d", hours, minutes, seconds)
     } else {
