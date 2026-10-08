@@ -249,6 +249,7 @@ hiddenTracksRefresh++
 ✅ No file-system deletion is performed
 
 Note: `clearHiddenTracks()` only clears the app’s hidden metadata stored in preferences. It does not remove the song files themselves from the phone or from the media library.
+
 # m6f ✓ - Seek Button Values Match Labels
 
 ## Problem
@@ -286,3 +287,77 @@ onFastForward = { service ->
 ✅ Fast-forward button now seeks 7 seconds forward as labeled
 ✅ Both seek buttons have consistent 7-second intervals
 ✅ Button labels accurately represent the seeking behavior
+
+# m6g ✓ - Pinned Track Click Crash Guard + Debug Toast
+
+## Problem
+The pinned-track click path was still able to throw during navigation/state transitions, even after the dedicated `m6b` handler. When that happened, the app could crash before we had enough information to see the exact bad state.
+
+## Root Cause
+The underlying state conflict was not yet fully isolated. A stale click path, stale selection, or mismatched `currentSong` / `isPlaying` state could still make the pinned-track open logic fail mid-navigation. Because the app was crashing in the click path itself, we had no reliable runtime trace of the exact values involved.
+
+## Solution
+Added defensive guards around the pinned-track navigation flow and surfaced a diagnostic toast whenever the click path fails:
+
+```kotlin
+fun openPlayer(song: Song) {
+    try {
+        val isSameSelectedSong = currentSong?.id == song.id
+        if (isSameSelectedSong && isPlaying) {
+            navController.navigate("player")
+            return
+        }
+
+        playerViewModel.selectSong(song, playing = true)
+        navController.navigate("player")
+    } catch (t: Throwable) {
+        val debugInfo = buildSongDebugInfo(song, "openPlayer")
+        Log.e("MainActivity", "openPlayer failed\n$debugInfo", t)
+        Toast.makeText(
+            context,
+            "Pinned-track open failed\n${t::class.simpleName}: ${t.message}\n\nDebug:\n$debugInfo",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+}
+```
+
+Also wrapped the pinned-track item click handler in a local `try/catch` with debug payload:
+
+```kotlin
+if (isCurrentTrack && onPinnedTrackClick != null) {
+    try {
+        onPinnedTrackClick(song)
+    } catch (t: Throwable) {
+        val debugInfo = buildString {
+            append("currentSongId=$currentSongId\n")
+            append("clickedSongId=${song.id}\n")
+            append("clickedSongUri=${song.uri}\n")
+            append("isCurrentTrack=$isCurrentTrack\n")
+            append("showHidden=$showHidden\n")
+            append("visibleItems=${visibleQueue.size}\n")
+            append("hiddenItems=${hiddenQueue.size}\n")
+        }
+        Log.e("SongListScreen", "Pinned-track click failed\n$debugInfo", t)
+        Toast.makeText(
+            context,
+            "Pinned-track click failed\n${t::class.simpleName}: ${t.message}\n\nDebug:\n$debugInfo",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+}
+```
+
+## Why This Fixes It
+- **No crash during live debugging**: the click path catches unexpected exceptions instead of crashing the app
+- **State visibility improves**: the toast includes the currently selected song, clicked song, route, active state, and selection token
+- **We can isolate the remaining mismatch**: instead of guessing, we can inspect the exact values when the bad state happens
+- **Production safety net**: even if the underlying root cause is still being diagnosed, the app remains usable and logs the failure details
+
+## Result
+✅ Pinned-track click no longer hard-crashes the app while debugging
+✅ Toast shows the exact song/state values involved in the failure
+✅ Runtime logs capture the failing path with full context
+✅ We can continue isolating the actual stale-state bug without losing the session
+
+This is a safe diagnostic layer: it does not claim to be the final root-cause fix, but it gives us the evidence we need to finish the real fix without the app dying mid-investigation.

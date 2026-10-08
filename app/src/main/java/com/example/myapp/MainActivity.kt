@@ -133,15 +133,41 @@ fun NavigationHost(
 
     // Canonical way to select/open a song: always update the view-model first,
     // then navigate. Old screens should never mutate the active song on their own.
-    fun openPlayer(song: Song) {
-        val isSameSelectedSong = currentSong?.id == song.id
-        if (isSameSelectedSong && isPlaying) {
-            navController.navigate("player")
-            return
+    fun buildSongDebugInfo(song: Song, source: String): String {
+        val activeSong = currentSong
+        return buildString {
+            append("source=$source\n")
+            append("clickedSongId=${song.id}\n")
+            append("clickedSongUri=${song.uri}\n")
+            append("activeSongId=${activeSong?.id ?: "null"}\n")
+            append("activeSongUri=${activeSong?.uri ?: "null"}\n")
+            append("isPlaying=$isPlaying\n")
+            append("selectionToken=$selectionToken\n")
+            append("route=${navController.currentDestination?.route ?: "null"}\n")
+            append("songsCount=${songs.size}\n")
+            append("currentSongNull=${currentSong == null}")
         }
+    }
 
-        playerViewModel.selectSong(song, playing = true)
-        navController.navigate("player")
+    fun openPlayer(song: Song) {
+        try {
+            val isSameSelectedSong = currentSong?.id == song.id
+            if (isSameSelectedSong && isPlaying) {
+                navController.navigate("player")
+                return
+            }
+
+            playerViewModel.selectSong(song, playing = true)
+            navController.navigate("player")
+        } catch (t: Throwable) {
+            val debugInfo = buildSongDebugInfo(song, "openPlayer")
+            Log.e("MainActivity", "openPlayer failed\n$debugInfo", t)
+            Toast.makeText(
+                context,
+                "Pinned-track open failed\n${t::class.simpleName}: ${t.message}\n\nDebug:\n$debugInfo",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     // Newer selection wins over any stale screen state. Old screens should skip

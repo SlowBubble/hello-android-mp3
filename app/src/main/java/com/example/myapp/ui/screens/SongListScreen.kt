@@ -1,6 +1,8 @@
 package com.example.myapp.ui.screens
 
 import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -439,10 +441,28 @@ fun SongListScreen(
                                 isHidden = storageManager.isTrackHidden(song),
                                 onSongClick = {
                                     val isCurrentTrack = song.id == currentSongId
-                                    
+
                                     if (isCurrentTrack && onPinnedTrackClick != null) {
                                         // M6b: Use dedicated pinned track handler to avoid crash
-                                        onPinnedTrackClick(song)
+                                        try {
+                                            onPinnedTrackClick(song)
+                                        } catch (t: Throwable) {
+                                            val debugInfo = buildString {
+                                                append("currentSongId=$currentSongId\n")
+                                                append("clickedSongId=${song.id}\n")
+                                                append("clickedSongUri=${song.uri}\n")
+                                                append("isCurrentTrack=$isCurrentTrack\n")
+                                                append("showHidden=$showHidden\n")
+                                                append("visibleItems=${visibleQueue.size}\n")
+                                                append("hiddenItems=${hiddenQueue.size}\n")
+                                            }
+                                            Log.e("SongListScreen", "Pinned-track click failed\n$debugInfo", t)
+                                            Toast.makeText(
+                                                context,
+                                                "Pinned-track click failed\n${t::class.simpleName}: ${t.message}\n\nDebug:\n$debugInfo",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
                                     } else {
                                         // Normal song click logic
                                         // M4e: Auto-unhide if playing from hidden page
