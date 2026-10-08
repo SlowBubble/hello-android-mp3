@@ -211,3 +211,41 @@ DisposableEffect(Unit) {
 ✅ Home navigation and pinned-track taps follow the same canonical path
 ✅ Skip/advance and stale player screens no longer fight for state ownership
 ✅ Crash-prone stale selection races are removed at the source
+
+# m6e ✓ - Hidden Track Clear Does Not Delete Files
+
+## Problem
+The app needed a way to clear the hidden list from the hidden page, but the behavior needed to be explicit: this action should remove tracks from the app’s hidden tracking state without removing the underlying song files from the phone.
+
+## Root Cause
+There was no dedicated clear action for the persisted hidden-track list. The app tracked hidden songs in `SharedPreferences`, not in the actual file system, so the operation needed to be a metadata reset rather than a file delete.
+
+## Solution
+Added a `clearHiddenTracks()` helper in `StorageManager` and wired the hidden-page second-row button to call it:
+
+```kotlin
+fun clearHiddenTracks() {
+    saveHiddenTracks(emptyList())
+}
+```
+
+The hidden-page button now calls:
+
+```kotlin
+storageManager.clearHiddenTracks()
+hiddenTracksRefresh++
+```
+
+## Why This Fixes It
+- **Only clears the hidden state**: it empties the persisted `hidden_tracks` list
+- **Does not delete device files**: no file removal or filesystem deletion occurs
+- **Tracks reappear on home**: once hidden-state is cleared, they are no longer excluded from the visible queue
+- **Safe reset behavior**: this is a UI/app-state cleanup, not a destructive media operation
+
+## Result
+✅ Hidden list can be fully cleared from the hidden page
+✅ All hidden tracks are restored to normal visibility in the app
+✅ Actual MP3 files on the phone remain untouched
+✅ No file-system deletion is performed
+
+Note: `clearHiddenTracks()` only clears the app’s hidden metadata stored in preferences. It does not remove the song files themselves from the phone or from the media library.

@@ -87,6 +87,25 @@ class StorageManager(private val context: Context) {
         saveHiddenTracks(hidden)
     }
 
+    fun deleteHiddenTracks(songs: List<Song>) {
+        val hiddenKeys = getHiddenTracks()
+        if (hiddenKeys.isEmpty()) return
+
+        val songsToDelete = songs.filter { song ->
+            hiddenKeys.any { hiddenKey -> QueueUtils.matchesSongIdentity(song, hiddenKey) }
+        }
+
+        songsToDelete.forEach { song ->
+            deleteTrack(song.title, song.uri)
+        }
+
+        saveHiddenTracks(emptyList())
+    }
+
+    fun clearHiddenTracks() {
+        saveHiddenTracks(emptyList())
+    }
+
     fun isTrackHidden(song: Song): Boolean {
         return getHiddenTracks().any { matchesHiddenValue(song, it) }
     }

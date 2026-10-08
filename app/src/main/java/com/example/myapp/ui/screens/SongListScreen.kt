@@ -220,27 +220,58 @@ fun SongListScreen(
             // Controls - different for home and hidden pages (as regular items, non-sticky)
             item {
                 if (showHidden) {
-                    // Hidden page: only "Home" button
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        horizontalArrangement = Arrangement.Center
+                    // Hidden page: Home on row 1, Delete All on row 2
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = { showHidden = !showHidden },
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
-                            )
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                "Home",
-                                fontSize = 14.sp,
-                                color = Color.White
-                            )
+                            Button(
+                                onClick = { showHidden = !showHidden },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    "Home",
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    storageManager.deleteHiddenTracks(songs)
+                                    hiddenTracksRefresh++
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.2f)
+                                )
+                            ) {
+                                Text(
+                                    "Delete All",
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 } else {
