@@ -324,20 +324,10 @@ fun PlayerScreen(
     // Save when screen is disposed (user navigates away)
     DisposableEffect(Unit) {
         onDispose {
-            val vmCurrentSong = playerViewModel.currentSong.value
-            val shouldPreserveNewerSong = vmCurrentSong != null && vmCurrentSong.id != song.id
-
-            if (shouldPreserveNewerSong) {
-                // A newer current song was already selected (e.g. user pressed Next),
-                // so do not overwrite it with this stale song on dispose.
+            val currentSelection = playerViewModel.currentSong.value
+            val isStaleSelection = currentSelection != null && currentSelection.id != song.id
+            if (isStaleSelection) {
                 return@onDispose
-            }
-
-            // Keep the currently selected track pinned even when playback is paused.
-            // The home list should still treat it as the active pinned item and show
-            // the demarcation below it until a different song becomes current.
-            if (vmCurrentSong == null || vmCurrentSong.id == song.id) {
-                playerViewModel.setCurrentSong(song)
             }
         }
     }

@@ -50,6 +50,11 @@ class PlayerViewModel : ViewModel() {
     private val _lastLoadedSongUri = MutableStateFlow("")
     val lastLoadedSongUri: StateFlow<String> = _lastLoadedSongUri.asStateFlow()
 
+    // M5e cleanup: canonical queue logic lives in a shared helper, not in the ViewModel.
+
+    private val _selectionToken = MutableStateFlow(0L)
+    val selectionToken: StateFlow<Long> = _selectionToken.asStateFlow()
+
     fun setLastLoadedSongUri(songUri: String) {
         _lastLoadedSongUri.value = songUri
     }
@@ -59,19 +64,21 @@ class PlayerViewModel : ViewModel() {
     }
 
     fun setCurrentSong(song: Song) {
-        _currentSong.value = song
-        _currentSongId.value = song.id
-        _isPlaying.value = true
+        selectSong(song, playing = true)
     }
 
     fun clearCurrentSong() {
+        val newToken = _selectionToken.value + 1L
         _currentSong.value = null
         _currentSongId.value = null
         _isPlaying.value = false
+        _selectionToken.value = newToken
     }
 
     fun setCurrentSongId(songId: Long?) {
+        val newToken = _selectionToken.value + 1L
         _currentSongId.value = songId
+        _selectionToken.value = newToken
         if (songId == null) {
             _currentSong.value = null
         }
@@ -191,7 +198,18 @@ class PlayerViewModel : ViewModel() {
         _sortMode.value = (_sortMode.value + 1) % 4
     }
 
-    // M5e cleanup: canonical queue logic lives in a shared helper, not in the ViewModel.
+    fun selectSong(song: Song, playing: Boolean = true): Long {
+        val newToken = _selectionToken.value + 1L
+        _currentSong.value = song
+        _currentSongId.value = song.id
+        _isPlaying.value = playing
+        _selectionToken.value = newToken
+        return newToken
+    }
+
+    fun isSelectionCurrent(songId: Long?, selectionToken: Long): Boolean {
+        return _currentSongId.value == songId && _selectionToken.value == selectionToken
+    }
 }
 
 

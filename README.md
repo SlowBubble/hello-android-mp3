@@ -1,5 +1,3 @@
-
-
 # m6c ✓ - Paused Track Stays Pinned
 
 ## Problem
@@ -135,3 +133,81 @@ fun getVisibleQueue(): List<Song> {
 ✅ Queue state always matches StorageManager truth
 ✅ No crashes when navigating after hiding tracks
 ✅ Stale parameter removed from critical path
+
+# m6d ✓ - Canonical Song Selection Cleanup
+
+## Problem
+The app still had stale state wins even after targeted fixes. Different screens and click paths were mutating the active song independently, so an older composable could overwrite the current selection after navigation, skip, or home-return actions.
+
+## Root Cause
+There were multiple mutation paths for the same concept:
+- `PlayerViewModel.currentSong`
+- `PlayerViewModel.currentSongId`
+- `PlayerViewModel.isPlaying`
+- direct `setCurrentSong(...)` calls from `MainActivity` and `PlayerScreen`
+- lifecycle dispose logic that re-selected a song even after a newer selection had already been made
+
+This meant an old `PlayerScreen` or old click handler could still “win” the race and clobber the canonical active track.
+
+## Solution
+Implemented a single canonical selection flow and removed stale-screen writes.
+
+### ViewModel
+Added a selection token and centralized selection updates:
+
+```kotlin
+private val _selectionToken = MutableStateFlow(0L)
+val selectionToken: StateFlow<Long> = _selectionToken.asStateFlow()
+
+fun selectSong(song: Song, playing: Boolean = true): Long {
+    val newToken = _selectionToken.value + 1L
+    _currentSong.value = song
+    _currentSongId.value = song.id
+    _isPlaying.value = playing
+    _selectionToken.value = newToken
+    return newToken
+}
+```
+
+### Navigation / selection entry points
+All player opens now route through one helper in `MainActivity`:
+
+```kotlin
+fun openPlayer(song: Song) {
+    val isSameSelectedSong = currentSong?.id == song.id
+    if (isSameSelectedSong && isPlaying) {
+        navController.navigate("player")
+        return
+    }
+
+    playerViewModel.selectSong(song, playing = true)
+    navController.navigate("player")
+}
+```
+
+### Stale screen guard
+`PlayerScreen` no longer reassigns the current song from `DisposableEffect` on dispose. Instead, stale screens exit quietly if a newer selection is already active.
+
+```kotlin
+DisposableEffect(Unit) {
+    onDispose {
+        val currentSelection = playerViewModel.currentSong.value
+        val isStaleSelection = currentSelection != null && currentSelection.id != song.id
+        if (isStaleSelection) {
+            return@onDispose
+        }
+    }
+}
+```
+
+## Why This Fixes It
+- **One canonical source of truth**: song selection is updated in one place
+- **Old screens cannot overwrite newer state**: selection tokens and stale guards block races
+- **Navigation is consistent**: all playback entry points follow the same logic
+- **Dispose logic is no longer stateful mutation**: it only saves progress and never reselects
+
+## Result
+✅ No stale screen can overwrite the active song selection
+✅ Home navigation and pinned-track taps follow the same canonical path
+✅ Skip/advance and stale player screens no longer fight for state ownership
+✅ Crash-prone stale selection races are removed at the source

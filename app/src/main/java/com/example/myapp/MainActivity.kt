@@ -18,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import androidx.media3.common.util.UnstableApi
+import com.example.myapp.data.Song
 import com.example.myapp.data.SongScanner
 import com.example.myapp.service.PlayerService
 import com.example.myapp.ui.screens.FilePickerScreen
@@ -37,6 +38,7 @@ fun NavigationHost(
     val songs by playerViewModel.songs.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
+    val selectionToken by playerViewModel.selectionToken.collectAsState()
 
     // Folder picker launcher
     val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -69,7 +71,7 @@ fun NavigationHost(
                         song.id.toString() == lastActiveTrackName
                     }
                     if (lastActiveSong != null) {
-                        playerViewModel.setCurrentSong(lastActiveSong)
+                        playerViewModel.selectSong(lastActiveSong, playing = true)
                     }
                     
                     navController.navigate("songList") {
@@ -107,7 +109,7 @@ fun NavigationHost(
                             song.id.toString() == lastActiveTrackName
                         }
                         if (lastActiveSong != null) {
-                            playerViewModel.setCurrentSong(lastActiveSong)
+                            playerViewModel.selectSong(lastActiveSong, playing = true)
                         }
                         
                         navController.navigate("songList") {
@@ -127,6 +129,25 @@ fun NavigationHost(
                 folderPickerLauncher.launch(null)
             }
         }
+    }
+
+    // Canonical way to select/open a song: always update the view-model first,
+    // then navigate. Old screens should never mutate the active song on their own.
+    fun openPlayer(song: Song) {
+        val isSameSelectedSong = currentSong?.id == song.id
+        if (isSameSelectedSong && isPlaying) {
+            navController.navigate("player")
+            return
+        }
+
+        playerViewModel.selectSong(song, playing = true)
+        navController.navigate("player")
+    }
+
+    // Newer selection wins over any stale screen state. Old screens should skip
+    // any mutation when their selection token is no longer current.
+    fun isCurrentSelection(song: Song): Boolean {
+        return playerViewModel.isSelectionCurrent(song.id, selectionToken)
     }
 
     NavHost(navController = navController, startDestination = "start") {
@@ -156,20 +177,12 @@ fun NavigationHost(
                         navController.navigate("player")
                     } else {
                         // Different song, or same song but paused — load and play
-                        playerViewModel.setCurrentSong(song)
-                        navController.navigate("player")
+                        openPlayer(song)
                     }
                 },
                 onPinnedTrackClick = { song ->
-                    // M6b: Standalone logic for pinned track to avoid crash
-                    if (isPlaying) {
-                        // Already playing — just navigate to player page
-                        navController.navigate("player")
-                    } else {
-                        // Not playing — load and play it first
-                        playerViewModel.setCurrentSong(song)
-                        navController.navigate("player")
-                    }
+                    // M6b cleanup: all pinned-track navigations go through the same canonical selection path
+                    openPlayer(song)
                 },
                 onFolderButtonClick = {
                     // Launch folder picker directly
@@ -289,8 +302,7 @@ fun NavigationHost(
                     onBack = { navController.popBackStack() },
                     onTrackHideAndNext = { nextSong ->
                         playerViewModel.setLastLoadedSongUri("")
-                        playerViewModel.setCurrentSong(nextSong)
-                        playerViewModel.setIsPlaying(true)
+                        playerViewModel.selectSong(nextSong, playing = true)
                         if (navController.currentDestination?.route == "player") {
                             navController.popBackStack(route = "player", inclusive = true)
                         }
@@ -298,8 +310,7 @@ fun NavigationHost(
                     },
                     onSkipToNext = { nextSong ->
                         playerViewModel.setLastLoadedSongUri("")
-                        playerViewModel.setCurrentSong(nextSong)
-                        playerViewModel.setIsPlaying(true)
+                        playerViewModel.selectSong(nextSong, playing = true)
                         if (navController.currentDestination?.route == "player") {
                             navController.popBackStack(route = "player", inclusive = true)
                         }
