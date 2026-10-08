@@ -249,3 +249,40 @@ hiddenTracksRefresh++
 ✅ No file-system deletion is performed
 
 Note: `clearHiddenTracks()` only clears the app’s hidden metadata stored in preferences. It does not remove the song files themselves from the phone or from the media library.
+# m6f ✓ - Seek Button Values Match Labels
+
+## Problem
+The rewind and fast-forward buttons had mislabeled seek values — the "-7s" button was seeking 45 seconds backwards, and the "+7s" button was seeking 9 seconds forwards instead of 7 seconds as labeled.
+
+## Root Cause
+The seek millisecond values in `MainActivity.kt` did not match the text labels displayed on the buttons in `PlayerScreen.kt`:
+- `onRewind` used `45_000L` (45 seconds) but showed "-7s"
+- `onFastForward` used `9_000L` (9 seconds) but showed "+7s"
+
+## Solution
+Updated the seek values in `MainActivity.kt` to match their button labels:
+
+```kotlin
+onRewind = { service ->
+    val newPos = (service.getCurrentPosition() - 7_000L).coerceAtLeast(0L)
+    service.seekTo(newPos)
+},
+onFastForward = { service ->
+    val duration = service.getDuration()
+    val newPos = (service.getCurrentPosition() + 7_000L)
+        .let { if (duration > 0) it.coerceAtMost(duration) else it }
+    service.seekTo(newPos)
+},
+```
+
+## Why This Fixes It
+- **Labels match behavior**: "-7s" now actually seeks 7 seconds backward
+- **Consistent seek duration**: both directions now use the same 7-second interval
+- **User expectations met**: players expect labeled seek values to be accurate
+- **Clear and predictable**: no confusion between button label and actual seek amount
+
+## Result
+✅ Rewind button now seeks 7 seconds backward as labeled
+✅ Fast-forward button now seeks 7 seconds forward as labeled
+✅ Both seek buttons have consistent 7-second intervals
+✅ Button labels accurately represent the seeking behavior

@@ -280,12 +280,12 @@ fun NavigationHost(
                         }
                     },
                     onRewind = { service ->
-                        val newPos = (service.getCurrentPosition() - 45_000L).coerceAtLeast(0L)
+                        val newPos = (service.getCurrentPosition() - 7_000L).coerceAtLeast(0L)
                         service.seekTo(newPos)
                     },
                     onFastForward = { service ->
                         val duration = service.getDuration()
-                        val newPos = (service.getCurrentPosition() + 9_000L)
+                        val newPos = (service.getCurrentPosition() + 7_000L)
                             .let { if (duration > 0) it.coerceAtMost(duration) else it }
                         service.seekTo(newPos)
                     },
