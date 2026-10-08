@@ -327,18 +327,17 @@ fun PlayerScreen(
             val vmCurrentSong = playerViewModel.currentSong.value
             val shouldPreserveNewerSong = vmCurrentSong != null && vmCurrentSong.id != song.id
 
-            if (service != null && service!!.isPlaying()) {
-                if (shouldPreserveNewerSong) {
-                    // A newer current song was already selected (e.g. user pressed Next),
-                    // so do not overwrite it with this stale song on dispose.
-                    return@onDispose
-                }
+            if (shouldPreserveNewerSong) {
+                // A newer current song was already selected (e.g. user pressed Next),
+                // so do not overwrite it with this stale song on dispose.
+                return@onDispose
+            }
+
+            // Keep the currently selected track pinned even when playback is paused.
+            // The home list should still treat it as the active pinned item and show
+            // the demarcation below it until a different song becomes current.
+            if (vmCurrentSong == null || vmCurrentSong.id == song.id) {
                 playerViewModel.setCurrentSong(song)
-            } else {
-                // If the current song in the VM is already different, keep the newer selection.
-                if (!shouldPreserveNewerSong) {
-                    playerViewModel.clearCurrentSong()
-                }
             }
         }
     }
