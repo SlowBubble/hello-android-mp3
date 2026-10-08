@@ -160,6 +160,17 @@ fun NavigationHost(
                         navController.navigate("player")
                     }
                 },
+                onPinnedTrackClick = { song ->
+                    // M6b: Standalone logic for pinned track to avoid crash
+                    if (isPlaying) {
+                        // Already playing — just navigate to player page
+                        navController.navigate("player")
+                    } else {
+                        // Not playing — load and play it first
+                        playerViewModel.setCurrentSong(song)
+                        navController.navigate("player")
+                    }
+                },
                 onFolderButtonClick = {
                     // Launch folder picker directly
                     folderPickerLauncher.launch(null)

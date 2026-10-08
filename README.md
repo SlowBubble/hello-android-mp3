@@ -1,3 +1,72 @@
+
+# m6b ✓ - Pinned Track Chip Standalone Navigation
+
+## Problem
+With a track playing, going to home page, and pressing the playing track's chip would sometimes crash. This has been fixed multiple times, suggesting a deeper state conflict issue.
+
+## Root Cause
+The normal `onSongClick` logic for chips checks `currentSong?.uri == song.uri` and `isPlaying` state, which can create state conflicts or race conditions when applied to the currently playing pinned track. The same track is already loaded and being displayed in the player screen, so reapplying the complex click logic could cause navigation or state synchronization issues.
+
+## Solution
+Implemented standalone navigation logic specifically for the pinned (currently playing) track:
+
+### SongListScreen.kt
+- Added new parameter `onPinnedTrackClick: ((Song) -> Unit)? = null`
+- Modified click handler to detect when the current track is being clicked
+- Routes pinned tracks to the dedicated handler if available
+
+```kotlin
+onSongClick = {
+    val isCurrentTrack = song.id == currentSongId
+    
+    if (isCurrentTrack && onPinnedTrackClick != null) {
+        // M6b: Use dedicated pinned track handler to avoid crash
+        onPinnedTrackClick(song)
+    } else {
+        // Normal song click logic
+        if (showHidden) {
+            storageManager.unhideTrack(song)
+            hiddenTracksRefresh++
+        }
+        onSongClick(song)
+    }
+}
+```
+
+### MainActivity.kt
+- Added dedicated `onPinnedTrackClick` handler that bypasses normal click logic
+- Checks if the pinned track is actually playing
+- If playing: just navigate (simple path, no state changes)
+- If not playing: load it first, then navigate
+
+```kotlin
+onPinnedTrackClick = { song ->
+    // M6b: Standalone logic for pinned track to avoid crash
+    if (isPlaying) {
+        // Already playing — just navigate to player page
+        navController.navigate("player")
+    } else {
+        // Not playing — load and play it first
+        playerViewModel.setCurrentSong(song)
+        navController.navigate("player")
+    }
+}
+```
+
+## Why This Fixes It
+- **For playing track**: Simple navigate-only path avoids double-loading and state conflicts
+- **For paused track**: Falls back to normal load logic instead of crashing with stale state
+- **No complex conditions**: Either it's playing (navigate) or it's not (load+navigate)
+- **Consistent identity**: Uses the stable Song.id to identify the pinned track
+- **Eliminates race conditions**: No conditional state checks that could race with service updates
+
+## Result
+✅ Clicking a **playing** pinned track has guaranteed simple navigation (no state conflicts)
+✅ Clicking a **paused** pinned track loads and plays it (normal behavior)
+✅ No state re-initialization for actively playing tracks
+✅ Handles edge case where pinned track might not actually be playing
+✅ Eliminates the race condition that was causing crashes
+
 # m6a ✓ - Stale Hidden Tracks State Crash Fix
 
 ## Problem

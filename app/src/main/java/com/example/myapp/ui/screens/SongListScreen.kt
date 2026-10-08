@@ -146,6 +146,7 @@ fun SongListScreen(
     songs: List<Song>,
     currentSongId: Long? = null,
     onSongClick: (Song) -> Unit,
+    onPinnedTrackClick: ((Song) -> Unit)? = null,
     onFolderButtonClick: (() -> Unit)? = null,
     onSwitchButtonClick: (() -> Unit)? = null,
     onSongDeleted: ((Song) -> Unit)? = null,
@@ -406,12 +407,20 @@ fun SongListScreen(
                                 progress = storageManager.getTrackProgress(song),
                                 isHidden = storageManager.isTrackHidden(song),
                                 onSongClick = {
-                                    // M4e: Auto-unhide if playing from hidden page
-                                    if (showHidden) {
-                                        storageManager.unhideTrack(song)
-                                        hiddenTracksRefresh++
+                                    val isCurrentTrack = song.id == currentSongId
+                                    
+                                    if (isCurrentTrack && onPinnedTrackClick != null) {
+                                        // M6b: Use dedicated pinned track handler to avoid crash
+                                        onPinnedTrackClick(song)
+                                    } else {
+                                        // Normal song click logic
+                                        // M4e: Auto-unhide if playing from hidden page
+                                        if (showHidden) {
+                                            storageManager.unhideTrack(song)
+                                            hiddenTracksRefresh++
+                                        }
+                                        onSongClick(song)
                                     }
-                                    onSongClick(song)
                                 },
                                 onHideClick = {
                                     storageManager.hideTrack(song)
