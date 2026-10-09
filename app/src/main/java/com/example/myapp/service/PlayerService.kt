@@ -25,6 +25,7 @@ class PlayerService : Service() {
         private set
     private var mediaSession: MediaSession? = null
     private var playerNotificationManager: PlayerNotificationManager? = null
+    private var playbackNotification: Notification? = null
     private val notificationId = 1001
     private val channelId = "audio_playback_channel"
 
@@ -160,15 +161,9 @@ class PlayerService : Service() {
             ongoing: Boolean
         ) {
             android.util.Log.d("PlayerService", "onNotificationPosted: id=$notificationId ongoing=$ongoing")
-            if (ongoing) {
-                try {
-                    startForeground(notificationId, notification)
-                    android.util.Log.d("PlayerService", "startForeground succeeded")
-                } catch (e: Exception) {
-                    // Handle ForegroundServiceStartNotAllowedException (API 31+)
-                    // This can happen when transitioning between tracks in the background
-                    android.util.Log.w("PlayerService", "Could not start foreground service: ${e.message}", e)
-                }
+            playbackNotification = notification
+            if (ongoing || isPlaybackActive()) {
+                promoteToForeground(notification)
             } else {
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -187,11 +182,14 @@ class PlayerService : Service() {
         override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
             android.util.Log.d("PlayerService", "onNotificationCancelled: id=$notificationId dismissedByUser=$dismissedByUser")
             
-            // If player is still playing, keep the service alive - don't stop foreground
-            if (exoPlayer.isPlaying) {
-                android.util.Log.d("PlayerService", "Player still playing, keeping service alive without foreground")
-                // Don't call stopForeground or stopSelf - let the service continue
-                // The notification will be reposted by playerNotificationManager when needed
+            if (isPlaybackActive()) {
+                android.util.Log.d("PlayerService", "Playback is active; restoring foreground notification")
+                val notification = playbackNotification
+                if (notification != null) {
+                    promoteToForeground(notification)
+                } else {
+                    android.util.Log.e("PlayerService", "Cannot restore foreground playback: notification is unavailable")
+                }
                 return
             }
             
@@ -207,6 +205,21 @@ class PlayerService : Service() {
                 android.util.Log.w("PlayerService", "Could not stop foreground on notification cancelled: ${e.message}", e)
             }
             stopSelf()
+        }
+    }
+
+    private fun isPlaybackActive(): Boolean {
+        return exoPlayer.playWhenReady &&
+            exoPlayer.playbackState != Player.STATE_IDLE &&
+            exoPlayer.playbackState != Player.STATE_ENDED
+    }
+
+    private fun promoteToForeground(notification: Notification) {
+        try {
+            startForeground(notificationId, notification)
+            android.util.Log.d("PlayerService", "startForeground succeeded")
+        } catch (e: Exception) {
+            android.util.Log.w("PlayerService", "Could not start foreground service: ${e.message}", e)
         }
     }
     
