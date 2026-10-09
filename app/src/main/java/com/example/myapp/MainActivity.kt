@@ -359,12 +359,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // Stop the player service when the activity is destroyed (e.g., force-close)
-        // This allows users to completely stop playback when killing the app
-        // While still allowing background playback when simply navigating away (home button)
-        Log.d("MainActivity", "onDestroy called - stopping PlayerService")
-        stopService(Intent(this, PlayerService::class.java))
-    }
 }

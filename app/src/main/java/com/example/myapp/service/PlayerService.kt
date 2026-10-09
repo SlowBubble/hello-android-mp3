@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.widget.Toast
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -40,9 +41,23 @@ class PlayerService : Service() {
         createNotificationChannel()
         
         // Create MediaSession
-        mediaSession = MediaSession.Builder(this, exoPlayer)
-            .setCallback(MediaSessionCallback())
-            .build()
+        mediaSession = try {
+            MediaSession.Builder(this, exoPlayer)
+                .setCallback(MediaSessionCallback())
+                .build()
+        } catch (e: IllegalStateException) {
+            if (e.message?.startsWith("Session ID must be unique.") != true) {
+                throw e
+            }
+
+            android.util.Log.e("PlayerService", "MediaSession ID is already active", e)
+            Toast.makeText(
+                this,
+                "Player controls couldn't start because a media session is already active. Restart the app if controls stop responding.",
+                Toast.LENGTH_LONG
+            ).show()
+            null
+        }
         
         // Create PlayerNotificationManager
         playerNotificationManager = PlayerNotificationManager.Builder(
@@ -56,7 +71,9 @@ class PlayerService : Service() {
             .build()
             .apply {
                 setPlayer(exoPlayer)
-                setMediaSessionToken(mediaSession!!.sessionCompatToken)
+                mediaSession?.let { session ->
+                    setMediaSessionToken(session.sessionCompatToken)
+                }
                 setUseRewindAction(true)
                 setUseFastForwardAction(true)
                 setUseRewindActionInCompactView(true)
@@ -71,14 +88,7 @@ class PlayerService : Service() {
 
     override fun onDestroy() {
         android.util.Log.d("PlayerService", "onDestroy called, isPlaying=${exoPlayer.isPlaying}")
-        
-        // If music is still playing, don't destroy the service
-        // This prevents cleanup when the service should continue in background
-        if (exoPlayer.isPlaying) {
-            android.util.Log.d("PlayerService", "Music still playing during onDestroy - NOT cleaning up resources")
-            return
-        }
-        
+
         playerNotificationManager?.setPlayer(null)
         mediaSession?.run {
             player.release()

@@ -1,3 +1,43 @@
+# m6h ✓ - MediaSession Duplicate-ID Crash Fix
+
+## Problem
+When audio was playing and the app screen went away, playback could stop. In some runs, opening the app again then crashed with this error:
+
+```text
+IllegalStateException: Session ID must be unique. ID=
+```
+
+It looked like a pinned-track click problem because that was one way to notice the failure. The device log showed the crash actually happened while Android was creating `PlayerService`, before the click handler could catch it.
+
+## A Few Android Terms
+- **Activity**: the app's screen and user interface. `MainActivity` displays the app.
+- **Service**: work that can continue without a screen. `PlayerService` owns ExoPlayer and plays audio.
+- **MediaSession**: the connection between the player and Android media controls, such as the notification and lock screen.
+- **`onDestroy()`**: a lifecycle callback saying that Android is destroying that particular Activity or Service. Returning from it does not cancel the destruction.
+
+## What Was Happening
+1. `MainActivity` starts `PlayerService`. The service owns the player, so it is supposed to keep playing when the screen is no longer visible.
+2. `MainActivity.onDestroy()` also called `stopService()`. That explicitly told Android to stop `PlayerService` when the Activity was destroyed. Android Home normally backgrounds the screen, but the Activity can later be destroyed while the app is in the background, so tying audio shutdown to the screen's lifetime was unsafe.
+3. The old `PlayerService.onDestroy()` tried to protect playback by returning early when audio was playing. But `onDestroy()` is not a way to refuse destruction. Android still destroyed the service; the early return just skipped releasing its resources.
+4. If another service instance was created in the same app process, it built a new `MediaSession`. The app does not set a custom session ID, so Media3 uses the default empty ID. The previous session had not been released, and Media3 rejected the new session because that ID was already in use.
+
+## Why It Was Tricky
+- The visible symptom was associated with a pinned-track tap, but the stack trace pointed to `MediaSession.Builder.build()` inside `PlayerService.onCreate()`.
+- The early return sounded like it would keep the service alive. It only skipped cleanup; it could not undo the stop request.
+- There was no session ID in our code to inspect. Media3 supplies the empty ID by default, and that ID still has to be unique among active sessions in the app.
+- The m6g `try/catch` blocks wrapped the tap and navigation code. They could not catch an exception thrown later while Android was creating the Service.
+
+## Fix
+- `MainActivity` no longer calls `stopService()` from `onDestroy()`. The Activity is the screen; it should not decide that audio must stop just because the screen goes away. The started playback service can continue in the background.
+- `PlayerService.onDestroy()` now always detaches the notification manager and releases the MediaSession and player. If Android really does destroy the service, it cleans up instead of leaving an old session registered.
+- If Media3 reports that the default session ID is already active, `PlayerService` logs the error and shows a toast. It continues setup without a MediaSession token so this specific exception does not crash service creation; media-session controls may be unavailable until the app is restarted.
+
+## Result
+✅ Pressing Android Home backgrounds the app without asking the player service to stop
+✅ The player service can keep audio playing without the Activity on screen
+✅ When the service is destroyed, it releases the old session so a later instance can create a new one
+✅ `./gradlew installDebug` compiled and installed successfully on the connected Pixel 9
+
 # m6c ✓ - Paused Track Stays Pinned
 
 ## Problem
