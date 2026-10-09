@@ -37,14 +37,6 @@ class PlayerViewModel : ViewModel() {
     private val _playbackRate = MutableStateFlow(1.0f)
     val playbackRate: StateFlow<Float> = _playbackRate.asStateFlow()
 
-    // M2: Hidden/completed tracks
-    private val _hiddenTracks = MutableStateFlow<Set<Long>>(emptySet())
-    val hiddenTracks: StateFlow<Set<Long>> = _hiddenTracks.asStateFlow()
-
-    // M2: Sort preference (0=shortest, 1=longest, 2=newest, 3=oldest)
-    private val _sortMode = MutableStateFlow(0)
-    val sortMode: StateFlow<Int> = _sortMode.asStateFlow()
-
     // M2f: Track the last loaded song URI to avoid reloading when navigating back
     // Using URI instead of ID because Song IDs are unstable (based on list position)
     private val _lastLoadedSongUri = MutableStateFlow("")
@@ -61,6 +53,19 @@ class PlayerViewModel : ViewModel() {
 
     fun setSongs(newSongs: List<Song>) {
         _songs.value = newSongs
+    }
+
+    fun removeSongs(deleted: Collection<Song>) {
+        if (deleted.isEmpty()) return
+
+        _songs.value = _songs.value.filterNot { song ->
+            deleted.any { song.matches(it) }
+        }
+
+        val current = _currentSong.value
+        if (current != null && deleted.any { current.matches(it) }) {
+            clearCurrentSong()
+        }
     }
 
     fun setCurrentSong(song: Song) {
@@ -170,32 +175,6 @@ class PlayerViewModel : ViewModel() {
         val chapterSize = duration / 10
         
         jumpToChapter(minOf(9, currentChapter + 1))
-    }
-
-    // M2: Hidden tracks management
-    fun setHiddenTracks(trackIds: Set<Long>) {
-        _hiddenTracks.value = trackIds
-    }
-
-    fun hideTrack(trackId: Long) {
-        val hidden = _hiddenTracks.value.toMutableSet()
-        hidden.add(trackId)
-        _hiddenTracks.value = hidden
-    }
-
-    fun unhideTrack(trackId: Long) {
-        val hidden = _hiddenTracks.value.toMutableSet()
-        hidden.remove(trackId)
-        _hiddenTracks.value = hidden
-    }
-
-    // M2: Sort preference
-    fun setSortMode(mode: Int) {
-        _sortMode.value = mode
-    }
-
-    fun cycleSortMode() {
-        _sortMode.value = (_sortMode.value + 1) % 4
     }
 
     fun selectSong(song: Song, playing: Boolean = true): Long {

@@ -15,6 +15,7 @@ data class Song(
     val lastPlayed: Long? = null,
     val totalListeningTime: Long = 0L // in milliseconds
 ) {
+    fun matches(other: Song): Boolean = id == other.id || uri == other.uri
     companion object {
         // Generate stable ID from URI
         fun generateStableId(uri: Uri): Long {

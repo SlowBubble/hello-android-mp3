@@ -151,7 +151,7 @@ fun SongListScreen(
     onPinnedTrackClick: ((Song) -> Unit)? = null,
     onFolderButtonClick: (() -> Unit)? = null,
     onSwitchButtonClick: (() -> Unit)? = null,
-    onSongDeleted: ((Song) -> Unit)? = null,
+    onSongsDeleted: ((List<Song>) -> Unit)? = null,
     folderDisplayName: String = "Switch",
     isShowingAllFolders: Boolean = false,
     modifier: Modifier = Modifier
@@ -258,7 +258,8 @@ fun SongListScreen(
                         ) {
                             Button(
                                 onClick = {
-                                    storageManager.deleteHiddenTracks(songs)
+                                    val deleted = storageManager.deleteHiddenTracks(songs)
+                                    onSongsDeleted?.invoke(deleted)
                                     hiddenTracksRefresh++
                                 },
                                 modifier = Modifier
@@ -482,10 +483,8 @@ fun SongListScreen(
                                     hiddenTracksRefresh++
                                 },
                                 onDeleteClick = {
-                                    // Delete the file from disk
-                                    storageManager.deleteTrack(song.title, song.uri)
-                                    storageManager.unhideTrack(song)
-                                    onSongDeleted?.invoke(song) // Notify parent to remove from list
+                                    storageManager.deleteSong(song)
+                                    onSongsDeleted?.invoke(listOf(song))
                                     hiddenTracksRefresh++
                                 },
                                 showingHidden = showHidden,

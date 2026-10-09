@@ -82,14 +82,18 @@ class StorageManager(private val context: Context) {
     }
 
     fun unhideTrack(song: Song) {
-        val hidden = getHiddenTracks().toMutableList()
-        hidden.remove(songKey(song))
+        val hidden = getHiddenTracks().filterNot { matchesHiddenValue(song, it) }
         saveHiddenTracks(hidden)
     }
 
-    fun deleteHiddenTracks(songs: List<Song>) {
+    fun deleteSong(song: Song) {
+        deleteTrack(song.title, song.uri)
+        unhideTrack(song)
+    }
+
+    fun deleteHiddenTracks(songs: List<Song>): List<Song> {
         val hiddenKeys = getHiddenTracks()
-        if (hiddenKeys.isEmpty()) return
+        if (hiddenKeys.isEmpty()) return emptyList()
 
         val songsToDelete = songs.filter { song ->
             hiddenKeys.any { hiddenKey -> QueueUtils.matchesSongIdentity(song, hiddenKey) }
@@ -100,6 +104,7 @@ class StorageManager(private val context: Context) {
         }
 
         saveHiddenTracks(emptyList())
+        return songsToDelete
     }
 
     fun clearHiddenTracks() {

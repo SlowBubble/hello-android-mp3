@@ -266,10 +266,8 @@ fun NavigationHost(
                     }
                     // Only 1 (or 0) folders in history — do nothing
                 },
-                onSongDeleted = { deletedSong ->
-                    // Remove deleted song from the list (by URI for stability)
-                    val updatedSongs = songs.filter { it.uri != deletedSong.uri }
-                    playerViewModel.setSongs(updatedSongs)
+                onSongsDeleted = { deletedSongs ->
+                    playerViewModel.removeSongs(deletedSongs)
                 },
                 folderDisplayName = folderDisplayName,
                 isShowingAllFolders = isShowingAllFolders
