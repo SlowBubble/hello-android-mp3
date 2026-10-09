@@ -26,8 +26,26 @@ class PlayerService : Service() {
     private var mediaSession: MediaSession? = null
     private var playerNotificationManager: PlayerNotificationManager? = null
     private var playbackNotification: Notification? = null
+    private var isForeground = false
     private val notificationId = 1001
     private val channelId = "audio_playback_channel"
+    private val playbackLogger = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            logPlaybackState("playbackStateChanged state=$playbackState")
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            logPlaybackState("playWhenReadyChanged value=$playWhenReady reason=$reason")
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            logPlaybackState("isPlayingChanged value=$isPlaying")
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            logPlaybackState("playerError error=${error.errorCodeName}: ${error.message}")
+        }
+    }
 
     inner class LocalBinder : Binder() {
         fun getService(): PlayerService = this@PlayerService
@@ -35,8 +53,9 @@ class PlayerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        android.util.Log.d("PlayerService", "onCreate called")
+        android.util.Log.d("PlayerService", "onCreate pid=${android.os.Process.myPid()} service=${System.identityHashCode(this)}")
         exoPlayer = ExoPlayer.Builder(this).build()
+        exoPlayer.addListener(playbackLogger)
         
         // Create notification channel for Android O and above
         createNotificationChannel()
@@ -83,13 +102,19 @@ class PlayerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        android.util.Log.d("PlayerService", "onStartCommand called with intent=$intent flags=$flags startId=$startId")
+        logPlaybackState("onStartCommand action=${intent?.action} flags=$flags startId=$startId")
         return START_STICKY
     }
 
-    override fun onDestroy() {
-        android.util.Log.d("PlayerService", "onDestroy called, isPlaying=${exoPlayer.isPlaying}")
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        logPlaybackState("onTaskRemoved action=${rootIntent?.action}")
+        super.onTaskRemoved(rootIntent)
+    }
 
+    override fun onDestroy() {
+        logPlaybackState("onDestroy")
+
+        exoPlayer.removeListener(playbackLogger)
         playerNotificationManager?.setPlayer(null)
         mediaSession?.run {
             player.release()
@@ -101,12 +126,12 @@ class PlayerService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder {
-        android.util.Log.d("PlayerService", "onBind called with intent=$intent")
+        logPlaybackState("onBind action=${intent?.action}")
         return binder
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        android.util.Log.d("PlayerService", "onUnbind called with intent=$intent, isPlaying=${exoPlayer.isPlaying}")
+        logPlaybackState("onUnbind action=${intent?.action}")
         // Return true to receive onRebind call when client binds again
         // The service will continue playing music in the background via the notification
         return true
@@ -114,7 +139,7 @@ class PlayerService : Service() {
 
     override fun onRebind(intent: Intent?) {
         super.onRebind(intent)
-        android.util.Log.d("PlayerService", "onRebind called with intent=$intent")
+        logPlaybackState("onRebind action=${intent?.action}")
     }
     
     private fun createNotificationChannel() {
@@ -160,7 +185,7 @@ class PlayerService : Service() {
             notification: Notification,
             ongoing: Boolean
         ) {
-            android.util.Log.d("PlayerService", "onNotificationPosted: id=$notificationId ongoing=$ongoing")
+            logPlaybackState("onNotificationPosted id=$notificationId ongoing=$ongoing")
             playbackNotification = notification
             if (ongoing || isPlaybackActive()) {
                 promoteToForeground(notification)
@@ -172,6 +197,7 @@ class PlayerService : Service() {
                         @Suppress("DEPRECATION")
                         stopForeground(false)
                     }
+                    isForeground = false
                     android.util.Log.d("PlayerService", "stopForeground detach succeeded")
                 } catch (e: Exception) {
                     android.util.Log.w("PlayerService", "Could not stop foreground: ${e.message}", e)
@@ -180,7 +206,7 @@ class PlayerService : Service() {
         }
 
         override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
-            android.util.Log.d("PlayerService", "onNotificationCancelled: id=$notificationId dismissedByUser=$dismissedByUser")
+            logPlaybackState("onNotificationCancelled id=$notificationId dismissedByUser=$dismissedByUser")
             
             if (isPlaybackActive()) {
                 android.util.Log.d("PlayerService", "Playback is active; restoring foreground notification")
@@ -193,7 +219,10 @@ class PlayerService : Service() {
                 return
             }
             
-            // If player is not playing, stop the foreground service
+            // A notification can be cancelled during teardown or a transient
+            // playback-state change. Removing foreground status is safe here,
+            // but stopping the service can make it die as soon as the screen
+            // unbinds, even if playback resumes before then.
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -204,7 +233,7 @@ class PlayerService : Service() {
             } catch (e: Exception) {
                 android.util.Log.w("PlayerService", "Could not stop foreground on notification cancelled: ${e.message}", e)
             }
-            stopSelf()
+            isForeground = false
         }
     }
 
@@ -217,10 +246,26 @@ class PlayerService : Service() {
     private fun promoteToForeground(notification: Notification) {
         try {
             startForeground(notificationId, notification)
+            isForeground = true
             android.util.Log.d("PlayerService", "startForeground succeeded")
         } catch (e: Exception) {
             android.util.Log.w("PlayerService", "Could not start foreground service: ${e.message}", e)
         }
+    }
+
+    private fun logPlaybackState(event: String) {
+        val playerState = if (::exoPlayer.isInitialized) {
+            "playbackState=${exoPlayer.playbackState} playWhenReady=${exoPlayer.playWhenReady} " +
+                "isPlaying=${exoPlayer.isPlaying} suppression=${exoPlayer.playbackSuppressionReason} " +
+                "items=${exoPlayer.mediaItemCount} currentIndex=${exoPlayer.currentMediaItemIndex}"
+        } else {
+            "player=uninitialized"
+        }
+        android.util.Log.d(
+            "PlayerService",
+            "$event pid=${android.os.Process.myPid()} service=${System.identityHashCode(this)} " +
+                "foreground=$isForeground $playerState"
+        )
     }
     
     private inner class MediaSessionCallback : MediaSession.Callback {

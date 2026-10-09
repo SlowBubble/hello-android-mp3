@@ -350,6 +350,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        logLifecycle("onCreate")
         startService(Intent(this, PlayerService::class.java))
 
         setContent {
@@ -357,6 +358,39 @@ class MainActivity : ComponentActivity() {
                 NavigationHost(context = this)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        logLifecycle("onStart")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        logLifecycle("onResume")
+    }
+
+    override fun onPause() {
+        logLifecycle("onPause")
+        super.onPause()
+    }
+
+    override fun onStop() {
+        logLifecycle("onStop")
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        logLifecycle("onDestroy")
+        super.onDestroy()
+    }
+
+    private fun logLifecycle(event: String) {
+        Log.d(
+            "MainActivity",
+            "$event pid=${android.os.Process.myPid()} activity=${System.identityHashCode(this)} " +
+                "finishing=$isFinishing changingConfigurations=$isChangingConfigurations"
+        )
     }
 
 }
