@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -90,7 +91,7 @@ fun NavigationHost(
     }
 
     // Auto-load saved folder on app start
-    var hasAutoLoaded by remember { mutableStateOf(false) }
+    var hasAutoLoaded by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (!hasAutoLoaded) {
             hasAutoLoaded = true
