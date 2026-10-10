@@ -192,6 +192,7 @@ fun SongListScreen(
     }
 
     val sortedAndFiltered = if (showHidden) hiddenQueue else visibleQueue
+    val pinnedSongId = currentSongId ?: if (showHidden) null else sortedAndFiltered.firstOrNull()?.id
 
     // M4e: Auto-reset tracks that are within 25 seconds of the end
     val visibleSongs = remember(sortedAndFiltered, visibleCount) {
@@ -389,14 +390,13 @@ fun SongListScreen(
                 val itemsWithDemarcations = mutableListOf<SongListItem>()
                 var prevSong: Song? = null
                 var prevProgress: com.example.myapp.data.TrackProgress? = null
-                val pinnedSong = sortedAndFiltered.find { it.id == currentSongId }
+                val pinnedSong = sortedAndFiltered.find { it.id == pinnedSongId }
                 val pinnedSongIndex = visibleSongs.indexOfFirst { song ->
                     pinnedSong != null && (song.id == pinnedSong.id || song.uri == pinnedSong.uri)
                 }
 
                 visibleSongs.forEachIndexed { index, song ->
                     val progress = storageManager.getTrackProgress(song)
-                    val isCurrentTrack = song.id == currentSongId
                     val prevSongIndex = if (prevSong == null) null else visibleSongs.indexOfFirst { candidate ->
                         candidate.id == prevSong!!.id || candidate.uri == prevSong!!.uri
                     }
@@ -453,11 +453,11 @@ fun SongListScreen(
 
                             SongListItemComposable(
                                 song = song,
-                                isActive = song.id == currentSongId,
+                                isActive = song.id == pinnedSongId,
                                 progress = storageManager.getTrackProgress(song),
                                 isHidden = storageManager.isTrackHidden(song),
                                 onSongClick = {
-                                    val isCurrentTrack = song.id == currentSongId
+                                    val isCurrentTrack = song.id == pinnedSongId
 
                                     if (isCurrentTrack && onPinnedTrackClick != null) {
                                         // M6b: Use dedicated pinned track handler to avoid crash

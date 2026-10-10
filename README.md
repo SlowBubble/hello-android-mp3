@@ -1,3 +1,6 @@
+# m7c
+Regression: the first demarcation below the pinned track is gone when the app first starts (the first track should be considered the pinned/playing track even if it is paused).
+
 # m7b
 Regression: when the track ends, it doesn't go to the next track and hide the current track, not sure why.
 
