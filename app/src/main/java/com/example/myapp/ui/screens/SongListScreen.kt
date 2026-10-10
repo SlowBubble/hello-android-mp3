@@ -23,11 +23,11 @@ import com.example.myapp.ui.screens.QueueUtils
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class SortMode(val label: String, val symbol: String) {
-    SHORTEST("Sort", "📏"),
-    LONGEST("Sort", "📏📏📏"),
-    NEWEST("Sort", "⏳"),
-    OLDEST("Sort", "⏳⏳⏳")
+enum class SortMode(val buttonText: String) {
+    SHORTEST("Sort | ⏳"),
+    LONGEST("Sort | ⏳⏳⏳"),
+    NEWEST("Fresh"),
+    OLDEST("Stale")
 }
 
 // Sealed class for list items (song or demarcation)
@@ -365,7 +365,7 @@ fun SongListScreen(
                                 )
                             ) {
                                 Text(
-                                    "${SortMode.values()[sortMode].label} | ${SortMode.values()[sortMode].symbol}",
+                                    SortMode.values()[sortMode].buttonText,
                                     fontSize = 14.sp,
                                     color = Color.White
                                 )
