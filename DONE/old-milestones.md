@@ -1,3 +1,406 @@
+# m6h ✓ - MediaSession Duplicate-ID Crash Fix
+
+## Problem
+When audio was playing and the app screen went away, playback could stop. In some runs, opening the app again then crashed with this error:
+
+```text
+IllegalStateException: Session ID must be unique. ID=
+```
+
+It looked like a pinned-track click problem because that was one way to notice the failure. The device log showed the crash actually happened while Android was creating `PlayerService`, before the click handler could catch it.
+
+## A Few Android Terms
+- **Activity**: the app's screen and user interface. `MainActivity` displays the app.
+- **Service**: work that can continue without a screen. `PlayerService` owns ExoPlayer and plays audio.
+- **MediaSession**: the connection between the player and Android media controls, such as the notification and lock screen.
+- **`onDestroy()`**: a lifecycle callback saying that Android is destroying that particular Activity or Service. Returning from it does not cancel the destruction.
+
+## What Was Happening
+1. `MainActivity` starts `PlayerService`. The service owns the player, so it is supposed to keep playing when the screen is no longer visible.
+2. `MainActivity.onDestroy()` also called `stopService()`. That explicitly told Android to stop `PlayerService` when the Activity was destroyed. Android Home normally backgrounds the screen, but the Activity can later be destroyed while the app is in the background, so tying audio shutdown to the screen's lifetime was unsafe.
+3. The old `PlayerService.onDestroy()` tried to protect playback by returning early when audio was playing. But `onDestroy()` is not a way to refuse destruction. Android still destroyed the service; the early return just skipped releasing its resources.
+4. If another service instance was created in the same app process, it built a new `MediaSession`. The app does not set a custom session ID, so Media3 uses the default empty ID. The previous session had not been released, and Media3 rejected the new session because that ID was already in use.
+
+## Why It Was Tricky
+- The visible symptom was associated with a pinned-track tap, but the stack trace pointed to `MediaSession.Builder.build()` inside `PlayerService.onCreate()`.
+- The early return sounded like it would keep the service alive. It only skipped cleanup; it could not undo the stop request.
+- There was no session ID in our code to inspect. Media3 supplies the empty ID by default, and that ID still has to be unique among active sessions in the app.
+- The m6g `try/catch` blocks wrapped the tap and navigation code. They could not catch an exception thrown later while Android was creating the Service.
+
+## Fix
+- `MainActivity` no longer calls `stopService()` from `onDestroy()`. The Activity is the screen; it should not decide that audio must stop just because the screen goes away. The started playback service can continue in the background.
+- `PlayerService.onDestroy()` now always detaches the notification manager and releases the MediaSession and player. If Android really does destroy the service, it cleans up instead of leaving an old session registered.
+- If Media3 reports that the default session ID is already active, `PlayerService` logs the error and shows a toast. It continues setup without a MediaSession token so this specific exception does not crash service creation; media-session controls may be unavailable until the app is restarted.
+
+## Result
+✅ Pressing Android Home backgrounds the app without asking the player service to stop
+✅ The player service can keep audio playing without the Activity on screen
+✅ When the service is destroyed, it releases the old session so a later instance can create a new one
+✅ `./gradlew installDebug` compiled and installed successfully on the connected Pixel 9
+
+# m6c ✓ - Paused Track Stays Pinned
+
+## Problem
+When a track was paused and the user went back to the home page, the current track sometimes lost its pinned state and the demarcation divider disappeared even though it was still the selected track.
+
+## Root Cause
+`PlayerScreen` was clearing the active song on dispose whenever playback was not active, without checking whether the track was still the current selection. That removed the pinned song state and caused `SongListScreen` to stop treating it as the current pinned track.
+
+## Solution
+Updated the dispose guard so a paused track remains pinned as long as it is still the active current song, while still protecting against stale screens overriding a newer song selection.
+
+```kotlin
+DisposableEffect(Unit) {
+    onDispose {
+        val vmCurrentSong = playerViewModel.currentSong.value
+        val shouldPreserveNewerSong = vmCurrentSong != null && vmCurrentSong.id != song.id
+
+        if (shouldPreserveNewerSong) {
+            return@onDispose
+        }
+
+        if (vmCurrentSong == null || vmCurrentSong.id == song.id) {
+            playerViewModel.setCurrentSong(song)
+        }
+    }
+}
+```
+
+## Why This Fixes It
+- **Paused track stays pinned**: the selected song remains the active pinned item even when playback is paused
+- **Demarcation remains visible**: the home list still knows which song is the current track boundary
+- **Stale state is still blocked**: a newer selected song continues to win over any older disposed screen
+- **No accidental clear on home navigation**: pause is not treated like “this track is no longer current”
+
+## Result
+✅ Paused current track still shows as pinned on Home
+✅ Demarcation remains below the pinned track
+✅ Returning home does not clear the active track while paused
+✅ A newer track still correctly replaces the old one after skip/advance
+
+# m6b ✓ - Pinned Track Chip Standalone Navigation
+
+## Problem
+With a track playing, going to home page, and pressing the playing track's chip would sometimes crash. This has been fixed multiple times, suggesting a deeper state conflict issue.
+
+## Root Cause
+The normal `onSongClick` logic for chips checks `currentSong?.uri == song.uri` and `isPlaying` state, which can create state conflicts or race conditions when applied to the currently playing pinned track. The same track is already loaded and being displayed in the player screen, so reapplying the complex click logic could cause navigation or state synchronization issues.
+
+## Solution
+Implemented standalone navigation logic specifically for the pinned (currently playing) track:
+
+### SongListScreen.kt
+- Added new parameter `onPinnedTrackClick: ((Song) -> Unit)? = null`
+- Modified click handler to detect when the current track is being clicked
+- Routes pinned tracks to the dedicated handler if available
+
+```kotlin
+onSongClick = {
+    val isCurrentTrack = song.id == currentSongId
+    
+    if (isCurrentTrack && onPinnedTrackClick != null) {
+        // M6b: Use dedicated pinned track handler to avoid crash
+        onPinnedTrackClick(song)
+    } else {
+        // Normal song click logic
+        if (showHidden) {
+            storageManager.unhideTrack(song)
+            hiddenTracksRefresh++
+        }
+        onSongClick(song)
+    }
+}
+```
+
+### MainActivity.kt
+- Added dedicated `onPinnedTrackClick` handler that bypasses normal click logic
+- Checks if the pinned track is actually playing
+- If playing: just navigate (simple path, no state changes)
+- If not playing: load it first, then navigate
+
+```kotlin
+onPinnedTrackClick = { song ->
+    // M6b: Standalone logic for pinned track to avoid crash
+    if (isPlaying) {
+        // Already playing — just navigate to player page
+        navController.navigate("player")
+    } else {
+        // Not playing — load and play it first
+        playerViewModel.setCurrentSong(song)
+        navController.navigate("player")
+    }
+}
+```
+
+## Why This Fixes It
+- **For playing track**: Simple navigate-only path avoids double-loading and state conflicts
+- **For paused track**: Falls back to normal load logic instead of crashing with stale state
+- **No complex conditions**: Either it's playing (navigate) or it's not (load+navigate)
+- **Consistent identity**: Uses the stable Song.id to identify the pinned track
+- **Eliminates race conditions**: No conditional state checks that could race with service updates
+
+## Result
+✅ Clicking a **playing** pinned track has guaranteed simple navigation (no state conflicts)
+✅ Clicking a **paused** pinned track loads and plays it (normal behavior)
+✅ No state re-initialization for actively playing tracks
+✅ Handles edge case where pinned track might not actually be playing
+✅ Eliminates the race condition that was causing crashes
+
+# m6a ✓ - Stale Hidden Tracks State Crash Fix
+
+## Problem
+After pressing "X" to hide current track and advance to next, then returning to homepage and clicking the now-playing track item → **CRASH**
+
+## Root Cause
+`PlayerScreen.getVisibleQueue()` was using a stale `hiddenTracks` parameter instead of reading the current state from `StorageManager`. When `storageManager.hideTrack()` was called, the parameter didn't update, so subsequent queue calculations included already-hidden tracks, causing state mismatch and navigation crashes.
+
+## Solution
+Modified `getVisibleQueue()` to always read current hidden tracks directly from StorageManager:
+```kotlin
+fun getVisibleQueue(): List<Song> {
+    val activeSongId = currentVmSongId ?: song.id
+    val currentHiddenTracks = storageManager.getHiddenTracks()  // Read current state, not stale parameter
+    return QueueUtils.buildVisibleQueue(
+        songs = songs,
+        sortMode = storageManager.getSortIndex(),
+        hiddenTrackKeys = currentHiddenTracks,
+        currentSongId = activeSongId
+    )
+}
+```
+
+## Result
+✅ Queue state always matches StorageManager truth
+✅ No crashes when navigating after hiding tracks
+✅ Stale parameter removed from critical path
+
+# m6d ✓ - Canonical Song Selection Cleanup
+
+## Problem
+The app still had stale state wins even after targeted fixes. Different screens and click paths were mutating the active song independently, so an older composable could overwrite the current selection after navigation, skip, or home-return actions.
+
+## Root Cause
+There were multiple mutation paths for the same concept:
+- `PlayerViewModel.currentSong`
+- `PlayerViewModel.currentSongId`
+- `PlayerViewModel.isPlaying`
+- direct `setCurrentSong(...)` calls from `MainActivity` and `PlayerScreen`
+- lifecycle dispose logic that re-selected a song even after a newer selection had already been made
+
+This meant an old `PlayerScreen` or old click handler could still “win” the race and clobber the canonical active track.
+
+## Solution
+Implemented a single canonical selection flow and removed stale-screen writes.
+
+### ViewModel
+Added a selection token and centralized selection updates:
+
+```kotlin
+private val _selectionToken = MutableStateFlow(0L)
+val selectionToken: StateFlow<Long> = _selectionToken.asStateFlow()
+
+fun selectSong(song: Song, playing: Boolean = true): Long {
+    val newToken = _selectionToken.value + 1L
+    _currentSong.value = song
+    _currentSongId.value = song.id
+    _isPlaying.value = playing
+    _selectionToken.value = newToken
+    return newToken
+}
+```
+
+### Navigation / selection entry points
+All player opens now route through one helper in `MainActivity`:
+
+```kotlin
+fun openPlayer(song: Song) {
+    val isSameSelectedSong = currentSong?.id == song.id
+    if (isSameSelectedSong && isPlaying) {
+        navController.navigate("player")
+        return
+    }
+
+    playerViewModel.selectSong(song, playing = true)
+    navController.navigate("player")
+}
+```
+
+### Stale screen guard
+`PlayerScreen` no longer reassigns the current song from `DisposableEffect` on dispose. Instead, stale screens exit quietly if a newer selection is already active.
+
+```kotlin
+DisposableEffect(Unit) {
+    onDispose {
+        val currentSelection = playerViewModel.currentSong.value
+        val isStaleSelection = currentSelection != null && currentSelection.id != song.id
+        if (isStaleSelection) {
+            return@onDispose
+        }
+    }
+}
+```
+
+## Why This Fixes It
+- **One canonical source of truth**: song selection is updated in one place
+- **Old screens cannot overwrite newer state**: selection tokens and stale guards block races
+- **Navigation is consistent**: all playback entry points follow the same logic
+- **Dispose logic is no longer stateful mutation**: it only saves progress and never reselects
+
+## Result
+✅ No stale screen can overwrite the active song selection
+✅ Home navigation and pinned-track taps follow the same canonical path
+✅ Skip/advance and stale player screens no longer fight for state ownership
+✅ Crash-prone stale selection races are removed at the source
+
+# m6e ✓ - Hidden Track Clear Does Not Delete Files
+
+## Problem
+The app needed a way to clear the hidden list from the hidden page, but the behavior needed to be explicit: this action should remove tracks from the app’s hidden tracking state without removing the underlying song files from the phone.
+
+## Root Cause
+There was no dedicated clear action for the persisted hidden-track list. The app tracked hidden songs in `SharedPreferences`, not in the actual file system, so the operation needed to be a metadata reset rather than a file delete.
+
+## Solution
+Added a `clearHiddenTracks()` helper in `StorageManager` and wired the hidden-page second-row button to call it:
+
+```kotlin
+fun clearHiddenTracks() {
+    saveHiddenTracks(emptyList())
+}
+```
+
+The hidden-page button now calls:
+
+```kotlin
+storageManager.clearHiddenTracks()
+hiddenTracksRefresh++
+```
+
+## Why This Fixes It
+- **Only clears the hidden state**: it empties the persisted `hidden_tracks` list
+- **Does not delete device files**: no file removal or filesystem deletion occurs
+- **Tracks reappear on home**: once hidden-state is cleared, they are no longer excluded from the visible queue
+- **Safe reset behavior**: this is a UI/app-state cleanup, not a destructive media operation
+
+## Result
+✅ Hidden list can be fully cleared from the hidden page
+✅ All hidden tracks are restored to normal visibility in the app
+✅ Actual MP3 files on the phone remain untouched
+✅ No file-system deletion is performed
+
+Note: `clearHiddenTracks()` only clears the app’s hidden metadata stored in preferences. It does not remove the song files themselves from the phone or from the media library.
+
+# m6f ✓ - Seek Button Values Match Labels
+
+## Problem
+The rewind and fast-forward buttons had mislabeled seek values — the "-7s" button was seeking 45 seconds backwards, and the "+7s" button was seeking 9 seconds forwards instead of 7 seconds as labeled.
+
+## Root Cause
+The seek millisecond values in `MainActivity.kt` did not match the text labels displayed on the buttons in `PlayerScreen.kt`:
+- `onRewind` used `45_000L` (45 seconds) but showed "-7s"
+- `onFastForward` used `9_000L` (9 seconds) but showed "+7s"
+
+## Solution
+Updated the seek values in `MainActivity.kt` to match their button labels:
+
+```kotlin
+onRewind = { service ->
+    val newPos = (service.getCurrentPosition() - 7_000L).coerceAtLeast(0L)
+    service.seekTo(newPos)
+},
+onFastForward = { service ->
+    val duration = service.getDuration()
+    val newPos = (service.getCurrentPosition() + 7_000L)
+        .let { if (duration > 0) it.coerceAtMost(duration) else it }
+    service.seekTo(newPos)
+},
+```
+
+## Why This Fixes It
+- **Labels match behavior**: "-7s" now actually seeks 7 seconds backward
+- **Consistent seek duration**: both directions now use the same 7-second interval
+- **User expectations met**: players expect labeled seek values to be accurate
+- **Clear and predictable**: no confusion between button label and actual seek amount
+
+## Result
+✅ Rewind button now seeks 7 seconds backward as labeled
+✅ Fast-forward button now seeks 7 seconds forward as labeled
+✅ Both seek buttons have consistent 7-second intervals
+✅ Button labels accurately represent the seeking behavior
+
+# m6g ✓ - Pinned Track Click Crash Guard + Debug Toast
+
+## Problem
+The pinned-track click path was still able to throw during navigation/state transitions, even after the dedicated `m6b` handler. When that happened, the app could crash before we had enough information to see the exact bad state.
+
+## Root Cause
+The underlying state conflict was not yet fully isolated. A stale click path, stale selection, or mismatched `currentSong` / `isPlaying` state could still make the pinned-track open logic fail mid-navigation. Because the app was crashing in the click path itself, we had no reliable runtime trace of the exact values involved.
+
+## Solution
+Added defensive guards around the pinned-track navigation flow and surfaced a diagnostic toast whenever the click path fails:
+
+```kotlin
+fun openPlayer(song: Song) {
+    try {
+        val isSameSelectedSong = currentSong?.id == song.id
+        if (isSameSelectedSong && isPlaying) {
+            navController.navigate("player")
+            return
+        }
+
+        playerViewModel.selectSong(song, playing = true)
+        navController.navigate("player")
+    } catch (t: Throwable) {
+        val debugInfo = buildSongDebugInfo(song, "openPlayer")
+        Log.e("MainActivity", "openPlayer failed\n$debugInfo", t)
+        Toast.makeText(
+            context,
+            "Pinned-track open failed\n${t::class.simpleName}: ${t.message}\n\nDebug:\n$debugInfo",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+}
+```
+
+Also wrapped the pinned-track item click handler in a local `try/catch` with debug payload:
+
+```kotlin
+if (isCurrentTrack && onPinnedTrackClick != null) {
+    try {
+        onPinnedTrackClick(song)
+    } catch (t: Throwable) {
+        val debugInfo = buildString {
+            append("currentSongId=$currentSongId\n")
+            append("clickedSongId=${song.id}\n")
+            append("clickedSongUri=${song.uri}\n")
+            append("isCurrentTrack=$isCurrentTrack\n")
+            append("showHidden=$showHidden\n")
+            append("visibleItems=${visibleQueue.size}\n")
+            append("hiddenItems=${hiddenQueue.size}\n")
+        }
+        Log.e("SongListScreen", "Pinned-track click failed\n$debugInfo", t)
+        Toast.makeText(
+            context,
+            "Pinned-track click failed\n${t::class.simpleName}: ${t.message}\n\nDebug:\n$debugInfo",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+}
+```
+
+## Why This Fixes It
+- **No crash during live debugging**: the click path catches unexpected exceptions instead of crashing the app
+- **State visibility improves**: the toast includes the currently selected song, clicked song, route, active state, and selection token
+- **We can isolate the remaining mismatch**: instead of guessing, we can inspect the exact values when the bad state happens
+- **Production safety net**: even if the underlying root cause is still being diagnosed, the app remains usable and logs the failure details
+
+## Result
+✅ Pinned-track click no longer hard-crashes the app while debugging
+✅ Toast shows the exact song/state values involved in the failure
+✅ Runtime logs capture the failing path with full context
+✅ We can continue isolating the actual stale-state bug without losing the session
+
+This is a safe diagnostic layer: it does not claim to be the final root-cause fix, but it gives us the evidence we need to finish the real fix without the app dying mid-investigation.
 
 # m5g
 - sorting seems broken (1 video with 0:10/24:54 comes before one with 0:00/15:09)
