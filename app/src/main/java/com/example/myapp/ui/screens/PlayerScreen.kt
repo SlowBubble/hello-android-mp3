@@ -191,7 +191,30 @@ fun PlayerScreen(
         }
     }
 
-    val connection = remember(context, song) {
+    val handleTrackEnded by rememberUpdatedState(newValue = {
+        if (!trackEndedHandled) {
+            trackEndedHandled = true
+            try {
+                Log.d("PlayerScreen", "Track ended: ${song.title}")
+                saveProgress()
+                storageManager.hideTrack(song)
+
+                val nextSong = getNextTrackInSortOrder()
+                if (nextSong != null) {
+                    Log.d("PlayerScreen", "Advancing to next track: ${nextSong.title}")
+                    onTrackHideAndNext(nextSong)
+                } else {
+                    Log.d("PlayerScreen", "No more tracks available, going back")
+                    onBack()
+                }
+            } catch (e: Exception) {
+                Log.e("PlayerScreen", "Error auto-advancing to next track: ${e.message}", e)
+                onBack()
+            }
+        }
+    })
+
+    val connection = remember(context) {
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 if (binder is PlayerService.LocalBinder) {
@@ -211,35 +234,10 @@ fun PlayerScreen(
                     // Add listener for track end detection
                     val listener = object : Player.Listener {
                         override fun onPlaybackStateChanged(playbackState: Int) {
-                            Log.d("PlayerScreen", "Playback state changed: $playbackState for song: ${song.title}")
+                            val activeTitle = playerViewModel.currentSong.value?.title ?: song.title
+                            Log.d("PlayerScreen", "Playback state changed: $playbackState for song: $activeTitle")
                             if (playbackState == Player.STATE_ENDED) {
-                                // Track finished naturally
-                                if (!trackEndedHandled) {
-                                    trackEndedHandled = true
-                                    try {
-                                        Log.d("PlayerScreen", "Track ended: ${song.title}")
-                                        // Save progress
-                                        saveProgress()
-
-                                        // Hide current track
-                                        storageManager.hideTrack(song)
-
-                                        // Find next track in sorted order
-                                        val nextSong = getNextTrackInSortOrder()
-
-                                        if (nextSong != null) {
-                                            Log.d("PlayerScreen", "Advancing to next track: ${nextSong.title}")
-                                            onTrackHideAndNext(nextSong)
-                                        } else {
-                                            // No more non-hidden tracks, go back to home
-                                            Log.d("PlayerScreen", "No more tracks available, going back")
-                                            onBack()
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("PlayerScreen", "Error auto-advancing to next track: ${e.message}", e)
-                                        onBack()
-                                    }
-                                }
+                                handleTrackEnded()
                             }
                         }
                     }
@@ -265,6 +263,9 @@ fun PlayerScreen(
 
         onDispose {
             Log.d("PlayerScreen", "DisposableEffect(context) onDispose called, connected=$connected")
+            currentPlayerListener?.let { listener ->
+                service?.exoPlayer?.removeListener(listener)
+            }
             if (connected) {
                 context.unbindService(connection)
             }
