@@ -378,8 +378,8 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(
                 color = when {
-                    isPlaying -> Color(0xFF064e3b)  // Green
-                    connected -> Color(0xFF7f1d1d)  // Red
+                    isPlaying -> Color(0xFF7f1d1d)  // Red
+                    connected -> Color(0xFF064e3b)  // Green
                     else -> Color(0xFF667eea)        // Purple
                 },
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp)

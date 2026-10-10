@@ -1,3 +1,9 @@
+# m7e
+- My files has [xxx] near the end of the file, can you remove that part when displaying it in the home/hidden/player screen
+
+# m7d
+Let's flip the red and green, so it is red when playing and green when paused
+
 # m7c
 Regression: the first demarcation below the pinned track is gone when the app first starts (the first track should be considered the pinned/playing track even if it is paused).
 
