@@ -12,13 +12,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +63,9 @@ fun PlayerScreen(
 
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
+    var isBookmarked by remember(song.displayTitle) {
+        mutableStateOf(storageManager.getBookmarkedTitles().contains(song.displayTitle))
+    }
     
     // Collect lastLoadedSongUri from ViewModel to track across navigation
     val lastLoadedSongUri by playerViewModel.lastLoadedSongUri.collectAsState()
@@ -394,7 +402,7 @@ fun PlayerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top bar with playback rate button and hide button
+            // Top bar with bookmark and hide buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -403,30 +411,54 @@ fun PlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { 
-                        service?.let { 
-                            playbackRate = it.getPlaybackRate()
-                            // Cycle playback rate: 1.0 → 1.15 → 1.25 → 1.35 → 1.0
-                            val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
-                            val currentIndex = rates.indexOf(playbackRate.let { r ->
-                                rates.minByOrNull { kotlin.math.abs(it - r) } ?: 1.0f
-                            })
-                            val nextIndex = (currentIndex + 1) % rates.size
-                            it.setPlaybackRate(rates[nextIndex])
-                            playbackRate = rates[nextIndex]
+                    onClick = {
+                        if (isBookmarked) {
+                            storageManager.removeBookmarkedTitle(song.displayTitle)
+                        } else {
+                            storageManager.addBookmarkedTitle(song.displayTitle)
                         }
+                        isBookmarked = !isBookmarked
                     },
-                    modifier = Modifier
-                        .size(72.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(alpha = 0.15f)
+                        containerColor = if (isBookmarked) {
+                            Color(0xFFFF4444).copy(alpha = 0.2f)
+                        } else {
+                            Color.White.copy(alpha = 0.08f)
+                        }
                     ),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier
+                        .size(72.dp)
+                        .semantics {
+                            contentDescription = if (isBookmarked) {
+                                "Remove bookmark"
+                            } else {
+                                "Bookmark title"
+                            }
+                        }
                 ) {
-                    Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
+                    if (isBookmarked) {
+                        Text("🔖", fontSize = 24.sp, color = Color.White)
+                    } else {
+                        Canvas(modifier = Modifier.size(24.dp)) {
+                            val bookmark = Path().apply {
+                                moveTo(size.width * 0.25f, size.height * 0.12f)
+                                lineTo(size.width * 0.75f, size.height * 0.12f)
+                                lineTo(size.width * 0.75f, size.height * 0.9f)
+                                lineTo(size.width * 0.5f, size.height * 0.72f)
+                                lineTo(size.width * 0.25f, size.height * 0.9f)
+                                close()
+                            }
+                            drawPath(
+                                path = bookmark,
+                                color = Color.White.copy(alpha = 0.75f),
+                                style = Stroke(width = 1.8.dp.toPx())
+                            )
+                        }
+                    }
                 }
 
-                // Home button spanning the width between speed and X buttons
+                // Home button spanning the width between bookmark and X buttons
                 Button(
                     onClick = {
                         Log.d("PlayerScreen", "Top home button clicked")
@@ -723,11 +755,36 @@ fun PlayerScreen(
 
                     Button(
                         onClick = {
+                            service?.let {
+                                playbackRate = it.getPlaybackRate()
+                                val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
+                                val currentIndex = rates.indexOf(playbackRate.let { rate ->
+                                    rates.minByOrNull { candidate ->
+                                        kotlin.math.abs(candidate - rate)
+                                    } ?: 1.0f
+                                })
+                                val nextIndex = (currentIndex + 1) % rates.size
+                                it.setPlaybackRate(rates[nextIndex])
+                                playbackRate = rates[nextIndex]
+                            }
+                        },
+                        modifier = Modifier
+                            .width(96.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
+                    }
+
+                    Button(
+                        onClick = {
                             Log.d("PlayerScreen", "Bottom next button clicked. currentSong=${song.title} serviceConnected=$connected")
                             moveToNextTrack(hideCurrent = false)
                         },
                         modifier = Modifier
-                            .width(120.dp)
+                            .weight(1f)
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF10b981).copy(alpha = 0.25f)

@@ -1,5 +1,6 @@
 
 # m7h
+- Move the 1.00x button to the bottom row and in its place, let's add a bookmark icon button, which just persists the displayed title in a bookmark title list, and display that title list in the hidden page below the tracks
 
 # m7g
 strange thing: when my screen auto-rotate, it triggers folder selection to be open

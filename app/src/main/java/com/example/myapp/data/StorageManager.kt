@@ -20,6 +20,7 @@ class StorageManager(private val context: Context) {
     companion object {
         private const val KEY_TRACK_PROGRESS = "track_progress_"
         private const val KEY_HIDDEN_TRACKS = "hidden_tracks"
+        private const val KEY_BOOKMARK_TITLES = "bookmark_titles"
         private const val KEY_SORT_INDEX = "sort_index"
         private const val KEY_LAST_ACTIVE_TRACK = "last_active_track"
         private const val KEY_FOLDER_URI = "folder_uri"
@@ -129,6 +130,40 @@ class StorageManager(private val context: Context) {
         try {
             val json = json.encodeToString(tracks.map { it.trim() }.filter { it.isNotEmpty() }.distinct())
             prefs.edit().putString(KEY_HIDDEN_TRACKS, json).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getBookmarkedTitles(): List<String> {
+        return try {
+            val stored = prefs.getString(KEY_BOOKMARK_TITLES, "[]") ?: "[]"
+            Json.decodeFromString<List<String>>(stored)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    fun addBookmarkedTitle(title: String) {
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isEmpty()) return
+
+        try {
+            val titles = (getBookmarkedTitles() + normalizedTitle).distinct()
+            prefs.edit().putString(KEY_BOOKMARK_TITLES, json.encodeToString(titles)).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun removeBookmarkedTitle(title: String) {
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isEmpty()) return
+
+        try {
+            val titles = getBookmarkedTitles().filterNot { it == normalizedTitle }
+            prefs.edit().putString(KEY_BOOKMARK_TITLES, json.encodeToString(titles)).apply()
         } catch (e: Exception) {
             e.printStackTrace()
         }

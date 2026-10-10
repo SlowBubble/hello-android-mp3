@@ -173,6 +173,9 @@ fun SongListScreen(
     val hiddenTracks = remember(showHidden, songs, hiddenTracksRefresh) {
         storageManager.getHiddenTracks()
     }
+    var bookmarkedTitles by remember(showHidden, songs) {
+        mutableStateOf(if (showHidden) storageManager.getBookmarkedTitles() else emptyList())
+    }
 
     val visibleQueue = remember(songs, sortMode, hiddenTracks, currentSongId) {
         QueueUtils.buildVisibleQueue(
@@ -530,6 +533,58 @@ fun SongListScreen(
                                 "Load ${minOf(30, remaining)} more ($remaining remaining)",
                                 color = Color.White
                             )
+                        }
+                    }
+                }
+            }
+
+            if (showHidden) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp, bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Bookmarks",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
+                        if (bookmarkedTitles.isEmpty()) {
+                            Text(
+                                "No bookmarks yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        } else {
+                            bookmarkedTitles.forEach { title ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            storageManager.removeBookmarkedTitle(title)
+                                            bookmarkedTitles = bookmarkedTitles.filterNot { it == title }
+                                        },
+                                        modifier = Modifier.size(40.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFFF4444).copy(alpha = 0.2f)
+                                        ),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("✕", color = Color.White)
+                                    }
+                                    Text(
+                                        title,
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White.copy(alpha = 0.9f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
