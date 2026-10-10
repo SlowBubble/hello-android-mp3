@@ -7,6 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class PlayerOverlay {
+    NONE,
+    HOME,
+    HIDDEN
+}
+
 class PlayerViewModel : ViewModel() {
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
@@ -46,6 +52,21 @@ class PlayerViewModel : ViewModel() {
 
     private val _selectionToken = MutableStateFlow(0L)
     val selectionToken: StateFlow<Long> = _selectionToken.asStateFlow()
+
+    private val _overlay = MutableStateFlow(PlayerOverlay.NONE)
+    val overlay: StateFlow<PlayerOverlay> = _overlay.asStateFlow()
+
+    fun showHomeOverlay() {
+        _overlay.value = PlayerOverlay.HOME
+    }
+
+    fun showHiddenOverlay() {
+        _overlay.value = PlayerOverlay.HIDDEN
+    }
+
+    fun dismissOverlay() {
+        _overlay.value = PlayerOverlay.NONE
+    }
 
     fun setLastLoadedSongUri(songUri: String) {
         _lastLoadedSongUri.value = songUri

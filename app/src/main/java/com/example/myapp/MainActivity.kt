@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
@@ -39,6 +40,7 @@ fun NavigationHost(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val selectionToken by playerViewModel.selectionToken.collectAsState()
+    val overlay by playerViewModel.overlay.collectAsState()
 
     // Folder picker launcher
     val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -153,12 +155,12 @@ fun NavigationHost(
         try {
             val isSameSelectedSong = currentSong?.id == song.id
             if (isSameSelectedSong && isPlaying) {
-                navController.navigate("player")
+                playerViewModel.dismissOverlay()
                 return
             }
 
+            playerViewModel.dismissOverlay()
             playerViewModel.selectSong(song, playing = true)
-            navController.navigate("player")
         } catch (t: Throwable) {
             val debugInfo = buildSongDebugInfo(song, "openPlayer")
             Log.e("MainActivity", "openPlayer failed\n$debugInfo", t)
@@ -176,171 +178,238 @@ fun NavigationHost(
         return playerViewModel.isSelectionCurrent(song.id, selectionToken)
     }
 
-    NavHost(navController = navController, startDestination = "start") {
-        composable("start") {
-            // Empty placeholder screen while loading
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(androidx.compose.ui.graphics.Color(0xFF667eea)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White)
+    if (currentSong == null) {
+        NavHost(navController = navController, startDestination = "start") {
+            composable("start") {
+                // Empty placeholder screen while loading
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Color(0xFF667eea)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+
+            composable("songList") {
+                val storageManager = remember { com.example.myapp.data.StorageManager(context) }
+                val folderDisplayName = remember(songs) { storageManager.getCurrentFolderDisplayName() }
+                val isShowingAllFolders = remember(songs) { storageManager.isShowAllFolders() }
+
+                SongListScreen(
+                    songs = songs,
+                    currentSongId = currentSong?.id,
+                    onSongClick = { song ->
+                        if (currentSong?.uri == song.uri && isPlaying) {
+                            playerViewModel.dismissOverlay()
+                        } else {
+                            openPlayer(song)
+                        }
+                    },
+                    onPinnedTrackClick = { song ->
+                        openPlayer(song)
+                    },
+                    onFolderButtonClick = {
+                        folderPickerLauncher.launch(null)
+                    },
+                    onSwitchButtonClick = {
+                        val storageManager = com.example.myapp.data.StorageManager(context)
+                        val history = storageManager.getFolderHistory()
+
+                        if (history.size > 1) {
+                            val currentIdx = storageManager.getCurrentFolderIndex()
+                            val isCurrentlyShowingAll = storageManager.isShowAllFolders()
+
+                            val nextIdx = if (isCurrentlyShowingAll) {
+                                storageManager.setShowAllFolders(false)
+                                0
+                            } else {
+                                val tentativeIdx = (currentIdx + 1) % history.size
+                                if (tentativeIdx == 0) {
+                                    storageManager.setShowAllFolders(true)
+                                    currentIdx
+                                } else {
+                                    tentativeIdx
+                                }
+                            }
+
+                            try {
+                                val scanner = SongScanner(context)
+                                val found = if (storageManager.isShowAllFolders()) {
+                                    scanner.scanMultipleFoldersForMp3s(history)
+                                } else {
+                                    val nextFolderUri = history[nextIdx]
+                                    storageManager.setCurrentFolderIndex(nextIdx)
+                                    scanner.scanFolderForMp3s(nextFolderUri)
+                                }
+
+                                if (found.isNotEmpty()) {
+                                    playerViewModel.setSongs(found)
+                                    playerViewModel.clearCurrentSong()
+                                } else {
+                                    Toast.makeText(context, "No MP3 files found", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "Switch folder error", e)
+                                Toast.makeText(context, "Error loading folder: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onSongsDeleted = { deletedSongs ->
+                        playerViewModel.removeSongs(deletedSongs)
+                    },
+                    folderDisplayName = folderDisplayName,
+                    isShowingAllFolders = isShowingAllFolders
+                )
             }
         }
-
-        composable("songList") {
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
             val storageManager = remember { com.example.myapp.data.StorageManager(context) }
-            val folderDisplayName = remember(songs) { storageManager.getCurrentFolderDisplayName() }
-            val isShowingAllFolders = remember(songs) { storageManager.isShowAllFolders() }
-            
-            SongListScreen(
-                songs = songs,
-                currentSongId = currentSong?.id,
-                onSongClick = { song ->
-                    if (currentSong?.uri == song.uri && isPlaying) {
-                        // Same song (by URI) and actively playing — just navigate, don't restart
-                        navController.navigate("player")
-                    } else {
-                        // Different song, or same song but paused — load and play
-                        openPlayer(song)
-                    }
-                },
-                onPinnedTrackClick = { song ->
-                    // M6b cleanup: all pinned-track navigations go through the same canonical selection path
-                    openPlayer(song)
-                },
-                onFolderButtonClick = {
-                    // Launch folder picker directly
-                    folderPickerLauncher.launch(null)
-                },
-                onSwitchButtonClick = {
-                    // Cycle to the next folder (or "All") in history and load its tracks
-                    val storageManager = com.example.myapp.data.StorageManager(context)
-                    val history = storageManager.getFolderHistory()
-                    
-                    if (history.size > 1) {
-                        val currentIdx = storageManager.getCurrentFolderIndex()
-                        val isCurrentlyShowingAll = storageManager.isShowAllFolders()
-                        
-                        // Determine next index
-                        val nextIdx = if (isCurrentlyShowingAll) {
-                            // Currently showing all, go back to first folder
-                            storageManager.setShowAllFolders(false)
-                            0
-                        } else {
-                            // Not showing all, check if next would be past the end
-                            val tentativeIdx = (currentIdx + 1) % history.size
-                            if (tentativeIdx == 0) {
-                                // We've wrapped around, show "All" instead
-                                storageManager.setShowAllFolders(true)
-                                currentIdx // Keep same index internally, but show all
-                            } else {
-                                tentativeIdx
-                            }
-                        }
-                        
-                        try {
-                            val scanner = SongScanner(context)
-                            val found = if (storageManager.isShowAllFolders()) {
-                                // Scan all folders and combine
-                                scanner.scanMultipleFoldersForMp3s(history)
-                            } else {
-                                // Scan just the next folder
-                                val nextFolderUri = history[nextIdx]
-                                storageManager.setCurrentFolderIndex(nextIdx)
-                                scanner.scanFolderForMp3s(nextFolderUri)
-                            }
-                            
-                            if (found.isNotEmpty()) {
-                                playerViewModel.setSongs(found)
-                                // Clear current song so no stale track from old folder is pinned
-                                playerViewModel.clearCurrentSong()
-                            } else {
-                                Toast.makeText(context, "No MP3 files found", Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (e: Exception) {
-                            Log.e("MainActivity", "Switch folder error", e)
-                            Toast.makeText(context, "Error loading folder: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    // Only 1 (or 0) folders in history — do nothing
-                },
-                onSongsDeleted = { deletedSongs ->
-                    playerViewModel.removeSongs(deletedSongs)
-                },
-                folderDisplayName = folderDisplayName,
-                isShowingAllFolders = isShowingAllFolders
-            )
-        }
+            val hiddenTracks = storageManager.getHiddenTracks()
+            val currentSongIndex = songs.indexOfFirst { it.uri == currentSong?.uri }
 
-        composable("player") {
-            if (currentSong != null) {
-                val context = LocalContext.current
-                val songToPlay = currentSong
-                LaunchedEffect(songToPlay) {
-                    val storageManager = com.example.myapp.data.StorageManager(context)
-                    storageManager.setLastActiveTrack(songToPlay)
-                }
-                
-                val storageManager = com.example.myapp.data.StorageManager(context)
-                val hiddenTracks = storageManager.getHiddenTracks()
-                val currentSongIndex = songs.indexOfFirst { it.uri == songToPlay?.uri }
-                
-                PlayerScreen(
-                    song = songToPlay!!,
-                    isPlaying = isPlaying,
-                    songs = songs,
-                    hiddenTracks = hiddenTracks,
-                    currentSongIndex = currentSongIndex,
-                    playerViewModel = playerViewModel,
-                    onPlayPause = { service ->
-                        if (isPlaying) {
-                            service.pause()
-                            playerViewModel.setIsPlaying(false)
-                        } else {
-                            service.play()
-                            playerViewModel.setIsPlaying(true)
-                        }
-                    },
-                    onRewind = { service ->
-                        val newPos = (service.getCurrentPosition() - 7_000L).coerceAtLeast(0L)
-                        service.seekTo(newPos)
-                    },
-                    onFastForward = { service ->
-                        val duration = service.getDuration()
-                        val newPos = (service.getCurrentPosition() + 7_000L)
-                            .let { if (duration > 0) it.coerceAtMost(duration) else it }
-                        service.seekTo(newPos)
-                    },
-                    onRewind45 = { service ->
-                        val newPos = (service.getCurrentPosition() - 45_000L).coerceAtLeast(0L)
-                        service.seekTo(newPos)
-                    },
-                    onFastForward45 = { service ->
-                        val duration = service.getDuration()
-                        val newPos = (service.getCurrentPosition() + 45_000L)
-                            .let { if (duration > 0) it.coerceAtMost(duration) else it }
-                        service.seekTo(newPos)
-                    },
-                    onBack = { navController.popBackStack() },
-                    onTrackHideAndNext = { nextSong ->
-                        playerViewModel.setLastLoadedSongUri("")
-                        playerViewModel.selectSong(nextSong, playing = true)
-                        if (navController.currentDestination?.route == "player") {
-                            navController.popBackStack(route = "player", inclusive = true)
-                        }
-                        navController.navigate("player")
-                    },
-                    onSkipToNext = { nextSong ->
-                        playerViewModel.setLastLoadedSongUri("")
-                        playerViewModel.selectSong(nextSong, playing = true)
-                        if (navController.currentDestination?.route == "player") {
-                            navController.popBackStack(route = "player", inclusive = true)
-                        }
-                        navController.navigate("player")
+            PlayerScreen(
+                song = currentSong!!,
+                isPlaying = isPlaying,
+                songs = songs,
+                hiddenTracks = hiddenTracks,
+                currentSongIndex = currentSongIndex,
+                playerViewModel = playerViewModel,
+                onPlayPause = { service ->
+                    if (isPlaying) {
+                        service.pause()
+                        playerViewModel.setIsPlaying(false)
+                    } else {
+                        service.play()
+                        playerViewModel.setIsPlaying(true)
                     }
-                )
+                },
+                onRewind = { service ->
+                    val newPos = (service.getCurrentPosition() - 7_000L).coerceAtLeast(0L)
+                    service.seekTo(newPos)
+                },
+                onFastForward = { service ->
+                    val duration = service.getDuration()
+                    val newPos = (service.getCurrentPosition() + 7_000L)
+                        .let { if (duration > 0) it.coerceAtMost(duration) else it }
+                    service.seekTo(newPos)
+                },
+                onRewind45 = { service ->
+                    val newPos = (service.getCurrentPosition() - 45_000L).coerceAtLeast(0L)
+                    service.seekTo(newPos)
+                },
+                onFastForward45 = { service ->
+                    val duration = service.getDuration()
+                    val newPos = (service.getCurrentPosition() + 45_000L)
+                        .let { if (duration > 0) it.coerceAtMost(duration) else it }
+                    service.seekTo(newPos)
+                },
+                onBack = {
+                    if (overlay != com.example.myapp.viewmodel.PlayerOverlay.NONE) {
+                        playerViewModel.dismissOverlay()
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+                onShowHome = {
+                    if (overlay == com.example.myapp.viewmodel.PlayerOverlay.NONE) {
+                        playerViewModel.showHomeOverlay()
+                    } else {
+                        playerViewModel.dismissOverlay()
+                    }
+                },
+                onTrackHideAndNext = { nextSong ->
+                    playerViewModel.setLastLoadedSongUri("")
+                    playerViewModel.selectSong(nextSong, playing = true)
+                    playerViewModel.dismissOverlay()
+                },
+                onSkipToNext = { nextSong ->
+                    playerViewModel.setLastLoadedSongUri("")
+                    playerViewModel.selectSong(nextSong, playing = true)
+                    playerViewModel.dismissOverlay()
+                }
+            )
+
+            if (overlay != com.example.myapp.viewmodel.PlayerOverlay.NONE) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.28f))
+                ) {
+                    val storageManager = remember { com.example.myapp.data.StorageManager(context) }
+                    val folderDisplayName = remember(songs) { storageManager.getCurrentFolderDisplayName() }
+                    val isShowingAllFolders = remember(songs) { storageManager.isShowAllFolders() }
+
+                    SongListScreen(
+                        songs = songs,
+                        currentSongId = currentSong?.id,
+                        onSongClick = { song ->
+                            openPlayer(song)
+                        },
+                        onPinnedTrackClick = { song ->
+                            openPlayer(song)
+                        },
+                        onFolderButtonClick = {
+                            folderPickerLauncher.launch(null)
+                        },
+                        onSwitchButtonClick = {
+                            val storageManager = com.example.myapp.data.StorageManager(context)
+                            val history = storageManager.getFolderHistory()
+
+                            if (history.size > 1) {
+                                val currentIdx = storageManager.getCurrentFolderIndex()
+                                val isCurrentlyShowingAll = storageManager.isShowAllFolders()
+
+                                val nextIdx = if (isCurrentlyShowingAll) {
+                                    storageManager.setShowAllFolders(false)
+                                    0
+                                } else {
+                                    val tentativeIdx = (currentIdx + 1) % history.size
+                                    if (tentativeIdx == 0) {
+                                        storageManager.setShowAllFolders(true)
+                                        currentIdx
+                                    } else {
+                                        tentativeIdx
+                                    }
+                                }
+
+                                try {
+                                    val scanner = SongScanner(context)
+                                    val found = if (storageManager.isShowAllFolders()) {
+                                        scanner.scanMultipleFoldersForMp3s(history)
+                                    } else {
+                                        val nextFolderUri = history[nextIdx]
+                                        storageManager.setCurrentFolderIndex(nextIdx)
+                                        scanner.scanFolderForMp3s(nextFolderUri)
+                                    }
+
+                                    if (found.isNotEmpty()) {
+                                        playerViewModel.setSongs(found)
+                                        playerViewModel.clearCurrentSong()
+                                    } else {
+                                        Toast.makeText(context, "No MP3 files found", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("MainActivity", "Switch folder error", e)
+                                    Toast.makeText(context, "Error loading folder: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        onSongsDeleted = { deletedSongs ->
+                            playerViewModel.removeSongs(deletedSongs)
+                        },
+                        folderDisplayName = folderDisplayName,
+                        isShowingAllFolders = isShowingAllFolders,
+                        isHiddenOverlay = overlay == com.example.myapp.viewmodel.PlayerOverlay.HIDDEN,
+                        onShowHome = { playerViewModel.showHomeOverlay() },
+                        onShowHidden = { playerViewModel.showHiddenOverlay() },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 56.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    )
+                }
             }
         }
     }

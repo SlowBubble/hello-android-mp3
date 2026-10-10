@@ -39,6 +39,7 @@ fun PlayerScreen(
     onRewind45: (PlayerService) -> Unit,
     onFastForward45: (PlayerService) -> Unit,
     onBack: () -> Unit,
+    onShowHome: () -> Unit = {},
     songs: List<Song> = emptyList(),
     hiddenTracks: List<String> = emptyList(),
     currentSongIndex: Int = 0,
@@ -362,7 +363,7 @@ fun PlayerScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -403,7 +404,7 @@ fun PlayerScreen(
                     onClick = {
                         Log.d("PlayerScreen", "Top home button clicked")
                         saveProgress()
-                        onBack()
+                        onShowHome()
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -636,7 +637,7 @@ fun PlayerScreen(
                         onClick = {
                             Log.d("PlayerScreen", "Bottom home button clicked")
                             saveProgress()
-                            onBack()
+                            onShowHome()
                         },
                         modifier = Modifier
                             .weight(1f)

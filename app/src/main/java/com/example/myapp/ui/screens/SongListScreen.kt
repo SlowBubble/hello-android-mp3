@@ -154,6 +154,9 @@ fun SongListScreen(
     onSongsDeleted: ((List<Song>) -> Unit)? = null,
     folderDisplayName: String = "Switch",
     isShowingAllFolders: Boolean = false,
+    isHiddenOverlay: Boolean? = null,
+    onShowHome: (() -> Unit)? = null,
+    onShowHidden: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -162,7 +165,8 @@ fun SongListScreen(
     var sortMode by remember {
         mutableIntStateOf(storageManager.getSortIndex())
     }
-    var showHidden by remember { mutableStateOf(false) }
+    var localShowHidden by remember { mutableStateOf(false) }
+    val showHidden = isHiddenOverlay ?: localShowHidden
     var visibleCount by remember { mutableIntStateOf(30) }
     var hiddenTracksRefresh by remember { mutableIntStateOf(0) }
 
@@ -234,7 +238,13 @@ fun SongListScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
-                                onClick = { showHidden = !showHidden },
+                                onClick = {
+                                    if (onShowHome != null) {
+                                        onShowHome()
+                                    } else {
+                                        localShowHidden = false
+                                    }
+                                },
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight(),
@@ -303,7 +313,13 @@ fun SongListScreen(
                                 Text("Folder", fontSize = 14.sp, color = Color.White)
                             }
                             Button(
-                                onClick = { showHidden = !showHidden },
+                                onClick = {
+                                    if (onShowHidden != null) {
+                                        onShowHidden()
+                                    } else {
+                                        localShowHidden = true
+                                    }
+                                },
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight(),
