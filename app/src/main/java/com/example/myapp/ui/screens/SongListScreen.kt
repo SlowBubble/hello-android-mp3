@@ -572,7 +572,7 @@ fun SongListItemComposable(
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            val itemTitle = if (isActive) "[NOW PLAYING] ${song.title}" else song.title
+            val itemTitle = if (isActive) "[NOW PLAYING] --- ${song.title}" else song.title
 
             Text(
                 itemTitle,
