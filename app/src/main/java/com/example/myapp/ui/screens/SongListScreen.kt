@@ -572,8 +572,10 @@ fun SongListItemComposable(
                 .padding(12.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            val itemTitle = if (isActive) "[NOW PLAYING]" else song.title
+
             Text(
-                song.title,
+                itemTitle,
                 style = MaterialTheme.typography.titleSmall,
                 color = Color.White,
                 maxLines = 1,

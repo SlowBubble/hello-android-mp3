@@ -137,6 +137,30 @@ fun PlayerScreen(
         saveProgressForSong(song)
     }
 
+    fun pickRandomTrack() {
+        val queue = getVisibleQueue()
+        if (queue.isEmpty()) return
+
+        val previousSong = song
+        val nextSong = queue.random()
+        val nextUri = nextSong.uri.toString()
+
+        Log.d(
+            "PlayerScreen",
+            "pickRandomTrack: from id=${previousSong.id} title=${previousSong.title} to id=${nextSong.id} title=${nextSong.title}"
+        )
+
+        saveProgressForSong(previousSong)
+        playerViewModel.setLastLoadedSongUri(nextUri)
+        playerViewModel.setCurrentSong(nextSong)
+        playerViewModel.setIsPlaying(true)
+
+        service?.let { svc ->
+            svc.loadUri(nextUri)
+            svc.play()
+        }
+    }
+
     fun moveToNextTrack(hideCurrent: Boolean) {
         val previousSong = song
         val nextSong = getNextTrackInSortOrder() ?: return
@@ -628,25 +652,25 @@ fun PlayerScreen(
                     }
                 }
 
-                // Home button - wide button below progress bar
+                // Random button and next button below progress bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = {
-                            Log.d("PlayerScreen", "Bottom home button clicked")
-                            saveProgress()
-                            onShowHome()
+                            Log.d("PlayerScreen", "Bottom random button clicked. currentSong=${song.title} serviceConnected=$connected")
+                            pickRandomTrack()
                         },
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White.copy(alpha = 0.15f)
-                        )
+                        ),
+                        enabled = getVisibleQueue().isNotEmpty()
                     ) {
-                        Text("🏠 Home", fontSize = 16.sp, color = Color.White)
+                        Text("Random >>|", fontSize = 16.sp, color = Color.White)
                     }
 
                     Button(
