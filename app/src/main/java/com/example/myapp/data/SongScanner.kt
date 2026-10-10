@@ -79,7 +79,7 @@ class SongScanner(private val context: Context) {
                 if (isMp3) {
                     // Build the actual content URI ExoPlayer can open
                     val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                    val title = name.removeSuffix(".mp3").removeSuffix(".MP3")
+                    val title = Song.sanitizeDisplayTitle(name.removeSuffix(".mp3").removeSuffix(".MP3"))
                     val duration = extractDurationMillis(docUri)
                     result.add(
                         Song(

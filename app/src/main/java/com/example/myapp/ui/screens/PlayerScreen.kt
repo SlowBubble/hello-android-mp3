@@ -523,7 +523,7 @@ fun PlayerScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        song.title,
+                        song.displayTitle,
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         modifier = Modifier.padding(16.dp),
@@ -531,19 +531,23 @@ fun PlayerScreen(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Text(
-                        song.artist,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+                    if (song.artist.isNotBlank() && song.artist != "Unknown Artist") {
+                        Text(
+                            song.artist,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
 
                     // M2: Playback rate display
-                    Text(
-                        "${String.format("%.2f", playbackRate)}x",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                    if (playbackRate != 1.0f) {
+                        Text(
+                            "${String.format("%.2f", playbackRate)}x",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
                 }
 
                 // Right: +45s button

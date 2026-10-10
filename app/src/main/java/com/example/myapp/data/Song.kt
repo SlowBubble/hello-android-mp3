@@ -15,8 +15,18 @@ data class Song(
     val lastPlayed: Long? = null,
     val totalListeningTime: Long = 0L // in milliseconds
 ) {
+    val displayTitle: String
+        get() = sanitizeDisplayTitle(title)
+
     fun matches(other: Song): Boolean = id == other.id || uri == other.uri
+
     companion object {
+        private val trailingBracketSuffix = Regex("""\s*\[[^\]]+\]\s*$""")
+
+        fun sanitizeDisplayTitle(rawTitle: String): String {
+            return rawTitle.replace(trailingBracketSuffix, "").trim()
+        }
+
         // Generate stable ID from URI
         fun generateStableId(uri: Uri): Long {
             return uri.toString().hashCode().toLong()

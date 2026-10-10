@@ -1,5 +1,9 @@
+
+# m7f
+- my headphones is playing really loud even at the lowest volume; is it possible to add 2 buttons above the Random/Next buttons to decrease/increase relative volume by 10% (default is 100%)
 # m7e
 - My files has [xxx] near the end of the file, can you remove that part when displaying it in the home/hidden/player screen
+- Also, no need to display "Unknown Artist" and 1.00x in the player page
 
 # m7d
 Let's flip the red and green, so it is red when playing and green when paused
