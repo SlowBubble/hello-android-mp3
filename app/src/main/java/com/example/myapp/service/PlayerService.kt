@@ -27,6 +27,7 @@ class PlayerService : Service() {
     private var playerNotificationManager: PlayerNotificationManager? = null
     private var playbackNotification: Notification? = null
     private var isForeground = false
+    private var relativeVolumePercent = 100
     private val notificationId = 1001
     private val channelId = "audio_playback_channel"
     private val playbackLogger = object : Player.Listener {
@@ -318,6 +319,14 @@ class PlayerService : Service() {
         android.util.Log.d("PlayerService", "play() called")
         exoPlayer.play()
     }
+
+    fun adjustRelativeVolume(changePercent: Int): Int {
+        relativeVolumePercent = (relativeVolumePercent + changePercent).coerceIn(0, 100)
+        exoPlayer.volume = relativeVolumePercent / 100f
+        return relativeVolumePercent
+    }
+
+    fun getRelativeVolumePercent(): Int = relativeVolumePercent
 
     fun seekTo(position: Long) {
         exoPlayer.seekTo(position)

@@ -53,6 +53,7 @@ fun PlayerScreen(
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var playbackRate by remember { mutableStateOf(1.0f) }
+    var relativeVolumePercent by remember { mutableIntStateOf(100) }
     var currentChapter by remember { mutableStateOf(0) }
 
     val context = LocalContext.current
@@ -220,6 +221,7 @@ fun PlayerScreen(
                 if (binder is PlayerService.LocalBinder) {
                     service = binder.getService()
                     connected = true
+                    relativeVolumePercent = service?.getRelativeVolumePercent() ?: 100
 
                     // Remove any previous listener before adding a new one
                     if (currentPlayerListener != null) {
@@ -654,6 +656,47 @@ fun PlayerScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.8f)
                         )
+                    }
+                }
+
+                Text(
+                    "Relative volume: $relativeVolumePercent%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+
+                // Adjust app playback gain independently of the device volume.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            service?.let { relativeVolumePercent = it.adjustRelativeVolume(-10) }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        ),
+                        enabled = connected && relativeVolumePercent > 0
+                    ) {
+                        Text("-10%", fontSize = 16.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = {
+                            service?.let { relativeVolumePercent = it.adjustRelativeVolume(10) }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        ),
+                        enabled = connected && relativeVolumePercent < 100
+                    ) {
+                        Text("+10%", fontSize = 16.sp, color = Color.White)
                     }
                 }
 

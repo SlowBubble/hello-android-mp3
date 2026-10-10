@@ -1,4 +1,6 @@
 
+# m7g
+strange thing: when my screen auto-rotate, it triggers folder selection to be open
 # m7f
 - my headphones is playing really loud even at the lowest volume; is it possible to add 2 buttons above the Random/Next buttons to decrease/increase relative volume by 10% (default is 100%)
 # m7e
