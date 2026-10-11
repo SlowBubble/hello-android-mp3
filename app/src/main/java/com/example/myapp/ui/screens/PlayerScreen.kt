@@ -691,12 +691,6 @@ fun PlayerScreen(
                     }
                 }
 
-                Text(
-                    "Relative volume: $relativeVolumePercent%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-
                 // Adjust app playback gain independently of the device volume.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -716,6 +710,11 @@ fun PlayerScreen(
                     ) {
                         Text("-10%", fontSize = 16.sp, color = Color.White)
                     }
+                    Text(
+                        "Vol: $relativeVolumePercent",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
                     Button(
                         onClick = {
                             service?.let { relativeVolumePercent = it.adjustRelativeVolume(10) }
