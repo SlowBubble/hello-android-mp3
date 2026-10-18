@@ -36,8 +36,8 @@ class StorageManager(private val context: Context) {
         val trimmed = value.trim()
         if (trimmed.isEmpty()) return false
 
-        // Canonical storage is always the stable song id, but keep a narrow compatibility
-        // fallback for older persisted values that used URI/title/legacy numeric ids.
+        // Hidden tracks use their URI as the canonical identity. Keep accepting legacy
+        // numeric IDs so tracks hidden by older app versions remain hidden.
         return QueueUtils.matchesSongIdentity(song, trimmed)
     }
 
@@ -74,7 +74,7 @@ class StorageManager(private val context: Context) {
 
     // ============== Hidden Tracks ==============
     fun hideTrack(song: Song) {
-        val canonicalKey = songKey(song)
+        val canonicalKey = song.uri.toString()
         val hidden = getHiddenTracks().toMutableList()
         if (!hidden.contains(canonicalKey)) {
             hidden.add(canonicalKey)

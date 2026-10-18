@@ -1,3 +1,5 @@
+# m8a
+- When I cycle thru folders and cycling back to the original folder, the hidden tracks seems to no longer be hidden. Can you fix it
 
 # m7h
 - Move the 1.00x button to the bottom row and in its place, let's add a bookmark icon button, which just persists the displayed title in a bookmark title list, and display that title list in the hidden page below the tracks
