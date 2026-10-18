@@ -36,7 +36,8 @@ object QueueUtils {
     fun buildHiddenQueue(
         songs: List<Song>,
         sortMode: Int,
-        hiddenTrackKeys: Iterable<String> = emptyList()
+        hiddenTrackKeys: Iterable<String> = emptyList(),
+        randomSortSeed: Long = 0L
     ): List<Song> {
         if (songs.isEmpty()) return emptyList()
 
@@ -47,6 +48,7 @@ object QueueUtils {
             SortMode.LONGEST -> songs.sortedByDescending { effectiveDuration(it) }
             SortMode.NEWEST -> songs.sortedByDescending { it.dateModified }
             SortMode.OLDEST -> songs.sortedBy { it.dateModified }
+            SortMode.RANDOM -> randomSorted(songs, randomSortSeed)
         }
 
         return sorted.filter { isSongHidden(it, hiddenTrackKeys) }
@@ -56,7 +58,8 @@ object QueueUtils {
         songs: List<Song>,
         sortMode: Int,
         hiddenTrackKeys: Iterable<String> = emptyList(),
-        currentSongId: Long? = null
+        currentSongId: Long? = null,
+        randomSortSeed: Long = 0L
     ): List<Song> {
         if (songs.isEmpty()) return emptyList()
 
@@ -67,6 +70,7 @@ object QueueUtils {
             SortMode.LONGEST -> songs.sortedByDescending { effectiveDuration(it) }
             SortMode.NEWEST -> songs.sortedByDescending { it.dateModified }
             SortMode.OLDEST -> songs.sortedBy { it.dateModified }
+            SortMode.RANDOM -> randomSorted(songs, randomSortSeed)
         }
 
         val visible = sorted.filterNot { isSongHidden(it, hiddenTrackKeys) }
@@ -83,6 +87,14 @@ object QueueUtils {
     fun findSongIndex(queue: List<Song>, song: Song?): Int {
         if (song == null) return -1
         return queue.indexOfFirst { it.id == song.id || it.uri == song.uri }
+    }
+
+    private fun randomSorted(songs: List<Song>, seed: Long): List<Song> {
+        return songs.sortedWith(
+            compareBy<Song> { song ->
+                kotlin.random.Random(seed xor song.uri.toString().hashCode().toLong()).nextLong()
+            }.thenBy { it.uri.toString() }
+        )
     }
 
     fun findSongIndexById(queue: List<Song>, songId: Long?): Int {

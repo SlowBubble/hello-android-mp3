@@ -27,7 +27,8 @@ enum class SortMode(val buttonText: String) {
     SHORTEST("Sort | ⏳"),
     LONGEST("Sort | ⏳⏳⏳"),
     NEWEST("Fresh"),
-    OLDEST("Stale")
+    OLDEST("Stale"),
+    RANDOM("Sort | 🔀")
 }
 
 // Sealed class for list items (song or demarcation)
@@ -100,6 +101,8 @@ private fun shouldAddDemarcation(
     storageManager: StorageManager,
     pinnedSong: Song?
 ): Boolean {
+    if (sortMode == SortMode.RANDOM) return false
+
     val samePinnedSong = pinnedSong != null && (prevSong.id == pinnedSong.id || prevSong.uri == pinnedSong.uri)
     val visiblePinnedBoundary = pinnedSong != null && prevSong.id == pinnedSong.id
 
@@ -123,6 +126,7 @@ private fun shouldAddDemarcation(
             val currentKey = getDateKey(currentSong.dateModified)
             prevKey != currentKey
         }
+        SortMode.RANDOM -> false
     }
 }
 
@@ -140,6 +144,7 @@ private fun getDemarcationLabel(
         SortMode.NEWEST, SortMode.OLDEST -> {
             formatDateLabel(song.dateModified)
         }
+        SortMode.RANDOM -> null
     }
 }
 
@@ -165,6 +170,9 @@ fun SongListScreen(
     var sortMode by remember {
         mutableIntStateOf(storageManager.getSortIndex())
     }
+    var randomSortSeed by remember {
+        mutableLongStateOf(storageManager.getRandomSortSeed())
+    }
     var localShowHidden by remember { mutableStateOf(false) }
     val showHidden = isHiddenOverlay ?: localShowHidden
     var visibleCount by remember { mutableIntStateOf(30) }
@@ -177,20 +185,22 @@ fun SongListScreen(
         mutableStateOf(if (showHidden) storageManager.getBookmarkedTitles() else emptyList())
     }
 
-    val visibleQueue = remember(songs, sortMode, hiddenTracks, currentSongId) {
+    val visibleQueue = remember(songs, sortMode, hiddenTracks, currentSongId, randomSortSeed) {
         QueueUtils.buildVisibleQueue(
             songs = songs,
             sortMode = sortMode,
             hiddenTrackKeys = hiddenTracks,
-            currentSongId = currentSongId
+            currentSongId = currentSongId,
+            randomSortSeed = randomSortSeed
         )
     }
 
-    val hiddenQueue = remember(songs, sortMode, hiddenTracks) {
+    val hiddenQueue = remember(songs, sortMode, hiddenTracks, randomSortSeed) {
         QueueUtils.buildHiddenQueue(
             songs = songs,
             sortMode = sortMode,
-            hiddenTrackKeys = hiddenTracks
+            hiddenTrackKeys = hiddenTracks,
+            randomSortSeed = randomSortSeed
         )
     }
 
@@ -358,6 +368,9 @@ fun SongListScreen(
                             Button(
                                 onClick = {
                                     sortMode = (sortMode + 1) % SortMode.values().size
+                                    if (SortMode.values()[sortMode] == SortMode.RANDOM) {
+                                        randomSortSeed = storageManager.reshuffleTracks()
+                                    }
                                     storageManager.setSortIndex(sortMode)
                                 },
                                 modifier = Modifier

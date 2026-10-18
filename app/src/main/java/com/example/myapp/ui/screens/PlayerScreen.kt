@@ -63,6 +63,16 @@ fun PlayerScreen(
 
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
+    var playerQueueSortMode by remember {
+        mutableIntStateOf(
+            if (storageManager.getSortIndex() == SortMode.RANDOM.ordinal) {
+                SortMode.RANDOM.ordinal
+            } else {
+                SortMode.SHORTEST.ordinal
+            }
+        )
+    }
+    var randomSortSeed by remember { mutableLongStateOf(storageManager.getRandomSortSeed()) }
     var isBookmarked by remember(song.displayTitle) {
         mutableStateOf(storageManager.getBookmarkedTitles().contains(song.displayTitle))
     }
@@ -83,9 +93,10 @@ fun PlayerScreen(
         val currentHiddenTracks = storageManager.getHiddenTracks()
         return QueueUtils.buildVisibleQueue(
             songs = songs,
-            sortMode = storageManager.getSortIndex(),
+            sortMode = playerQueueSortMode,
             hiddenTrackKeys = currentHiddenTracks,
-            currentSongId = activeSongId
+            currentSongId = activeSongId,
+            randomSortSeed = randomSortSeed
         )
     }
 
@@ -144,30 +155,6 @@ fun PlayerScreen(
     // Helper function to save progress
     fun saveProgress() {
         saveProgressForSong(song)
-    }
-
-    fun pickRandomTrack() {
-        val queue = getVisibleQueue()
-        if (queue.isEmpty()) return
-
-        val previousSong = song
-        val nextSong = queue.random()
-        val nextUri = nextSong.uri.toString()
-
-        Log.d(
-            "PlayerScreen",
-            "pickRandomTrack: from id=${previousSong.id} title=${previousSong.title} to id=${nextSong.id} title=${nextSong.title}"
-        )
-
-        saveProgressForSong(previousSong)
-        playerViewModel.setLastLoadedSongUri(nextUri)
-        playerViewModel.setCurrentSong(nextSong)
-        playerViewModel.setIsPlaying(true)
-
-        service?.let { svc ->
-            svc.loadUri(nextUri)
-            svc.play()
-        }
     }
 
     fun moveToNextTrack(hideCurrent: Boolean) {
@@ -731,15 +718,22 @@ fun PlayerScreen(
                     }
                 }
 
-                // Random button and next button below progress bar
+                // Sort and next buttons below progress bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = {
-                            Log.d("PlayerScreen", "Bottom random button clicked. currentSong=${song.title} serviceConnected=$connected")
-                            pickRandomTrack()
+                            playerQueueSortMode = if (playerQueueSortMode == SortMode.SHORTEST.ordinal) {
+                                SortMode.RANDOM.ordinal
+                            } else {
+                                SortMode.SHORTEST.ordinal
+                            }
+                            if (playerQueueSortMode == SortMode.RANDOM.ordinal) {
+                                randomSortSeed = storageManager.reshuffleTracks()
+                            }
+                            storageManager.setSortIndex(playerQueueSortMode)
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -747,9 +741,12 @@ fun PlayerScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White.copy(alpha = 0.15f)
                         ),
-                        enabled = getVisibleQueue().isNotEmpty()
                     ) {
-                        Text("Random >>|", fontSize = 16.sp, color = Color.White)
+                        Text(
+                            SortMode.values()[playerQueueSortMode].buttonText,
+                            fontSize = 16.sp,
+                            color = Color.White
+                        )
                     }
 
                     Button(

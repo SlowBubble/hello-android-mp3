@@ -22,6 +22,7 @@ class StorageManager(private val context: Context) {
         private const val KEY_HIDDEN_TRACKS = "hidden_tracks"
         private const val KEY_BOOKMARK_TITLES = "bookmark_titles"
         private const val KEY_SORT_INDEX = "sort_index"
+        private const val KEY_RANDOM_SORT_SEED = "random_sort_seed"
         private const val KEY_LAST_ACTIVE_TRACK = "last_active_track"
         private const val KEY_FOLDER_URI = "folder_uri"
         private const val KEY_FOLDER_HISTORY = "folder_history"
@@ -195,6 +196,14 @@ class StorageManager(private val context: Context) {
     }
 
     fun getSortIndex(): Int = prefs.getInt(KEY_SORT_INDEX, 0)
+
+    fun reshuffleTracks(): Long {
+        val seed = kotlin.random.Random.nextLong()
+        prefs.edit().putLong(KEY_RANDOM_SORT_SEED, seed).apply()
+        return seed
+    }
+
+    fun getRandomSortSeed(): Long = prefs.getLong(KEY_RANDOM_SORT_SEED, 0L)
 
     // ============== Folder URI ==============
     fun setFolderUri(folderUri: String?) {
