@@ -1,3 +1,6 @@
+# m8b
+- In the player page, the title is abbreviated too short. Can you double the character limit.
+
 # m8a
 - When I cycle thru folders and cycling back to the original folder, the hidden tracks seems to no longer be hidden. Can you fix it
 

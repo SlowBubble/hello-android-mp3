@@ -561,7 +561,7 @@ fun PlayerScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         modifier = Modifier.padding(16.dp),
-                        maxLines = 3,
+                        maxLines = 6,
                         overflow = TextOverflow.Ellipsis
                     )
 
