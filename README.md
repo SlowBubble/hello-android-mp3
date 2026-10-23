@@ -1,3 +1,10 @@
+
+# m8e
+- add a button to the left of Sort in the homepage that remove the current folder from the cycling and then cycle to the next selected folder
+
+# m8d
+- for cycling through folders, let's skip the "All"
+
 # m8c
 - Instead of the random button at the bottom of the player page, can we change it to be the sort button similar to the homepage, but just have 2 modes of sorting (unlike the homepage), 1 is by shortest estimated duration and 1 is randomly sorted.
 

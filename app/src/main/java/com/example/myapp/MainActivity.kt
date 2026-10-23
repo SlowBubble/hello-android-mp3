@@ -96,6 +96,8 @@ fun NavigationHost(
         if (!hasAutoLoaded) {
             hasAutoLoaded = true
             val storageManager = com.example.myapp.data.StorageManager(context)
+            // "All" is no longer part of folder cycling; clear any stale flag
+            storageManager.setShowAllFolders(false)
             val savedFolder = storageManager.getCurrentFolderUri()
             
             if (savedFolder != null) {
@@ -219,31 +221,16 @@ fun NavigationHost(
                         val history = storageManager.getFolderHistory()
 
                         if (history.size > 1) {
+                            // Skip "All" when cycling — only advance through real folders
                             val currentIdx = storageManager.getCurrentFolderIndex()
-                            val isCurrentlyShowingAll = storageManager.isShowAllFolders()
-
-                            val nextIdx = if (isCurrentlyShowingAll) {
-                                storageManager.setShowAllFolders(false)
-                                0
-                            } else {
-                                val tentativeIdx = (currentIdx + 1) % history.size
-                                if (tentativeIdx == 0) {
-                                    storageManager.setShowAllFolders(true)
-                                    currentIdx
-                                } else {
-                                    tentativeIdx
-                                }
-                            }
+                            storageManager.setShowAllFolders(false)
+                            val nextIdx = (currentIdx + 1) % history.size
 
                             try {
                                 val scanner = SongScanner(context)
-                                val found = if (storageManager.isShowAllFolders()) {
-                                    scanner.scanMultipleFoldersForMp3s(history)
-                                } else {
-                                    val nextFolderUri = history[nextIdx]
-                                    storageManager.setCurrentFolderIndex(nextIdx)
-                                    scanner.scanFolderForMp3s(nextFolderUri)
-                                }
+                                val nextFolderUri = history[nextIdx]
+                                storageManager.setCurrentFolderIndex(nextIdx)
+                                val found = scanner.scanFolderForMp3s(nextFolderUri)
 
                                 if (found.isNotEmpty()) {
                                     playerViewModel.setSongs(found)
@@ -360,31 +347,16 @@ fun NavigationHost(
                             val history = storageManager.getFolderHistory()
 
                             if (history.size > 1) {
+                                // Skip "All" when cycling — only advance through real folders
                                 val currentIdx = storageManager.getCurrentFolderIndex()
-                                val isCurrentlyShowingAll = storageManager.isShowAllFolders()
-
-                                val nextIdx = if (isCurrentlyShowingAll) {
-                                    storageManager.setShowAllFolders(false)
-                                    0
-                                } else {
-                                    val tentativeIdx = (currentIdx + 1) % history.size
-                                    if (tentativeIdx == 0) {
-                                        storageManager.setShowAllFolders(true)
-                                        currentIdx
-                                    } else {
-                                        tentativeIdx
-                                    }
-                                }
+                                storageManager.setShowAllFolders(false)
+                                val nextIdx = (currentIdx + 1) % history.size
 
                                 try {
                                     val scanner = SongScanner(context)
-                                    val found = if (storageManager.isShowAllFolders()) {
-                                        scanner.scanMultipleFoldersForMp3s(history)
-                                    } else {
-                                        val nextFolderUri = history[nextIdx]
-                                        storageManager.setCurrentFolderIndex(nextIdx)
-                                        scanner.scanFolderForMp3s(nextFolderUri)
-                                    }
+                                    val nextFolderUri = history[nextIdx]
+                                    storageManager.setCurrentFolderIndex(nextIdx)
+                                    val found = scanner.scanFolderForMp3s(nextFolderUri)
 
                                     if (found.isNotEmpty()) {
                                         playerViewModel.setSongs(found)
