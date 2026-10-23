@@ -187,6 +187,9 @@ fun NavigationHost(
      * Folders with no MP3s are skipped and we keep cycling forward. The current
      * folder index only moves when a non-empty folder is found, so the UI never
      * ends up pointing at an empty folder while still showing the old songs.
+     * 
+     * This now shows an overlay instead of clearing the current song, so playback
+     * continues uninterrupted while browsing folders.
      */
     fun switchToNextFolder() {
         val storageManager = com.example.myapp.data.StorageManager(context)
@@ -220,7 +223,8 @@ fun NavigationHost(
         if (foundSongs.isNotEmpty()) {
             storageManager.setCurrentFolderIndex(nextIdx)
             playerViewModel.setSongs(foundSongs)
-            playerViewModel.clearCurrentSong()
+            // Show overlay instead of clearing the song, so playback continues
+            playerViewModel.showFolderSwitchOverlay()
         } else {
             Toast.makeText(context, "No MP3 files found in other folders", Toast.LENGTH_SHORT).show()
         }
@@ -272,7 +276,8 @@ fun NavigationHost(
         if (foundSongs.isNotEmpty()) {
             storageManager.setCurrentFolderIndex(nextIdx)
             playerViewModel.setSongs(foundSongs)
-            playerViewModel.clearCurrentSong()
+            // Show overlay instead of clearing the song, so playback continues
+            playerViewModel.showFolderSwitchOverlay()
             Toast.makeText(context, "Removed folder, switched to next", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(context, "No MP3 files found in remaining folders", Toast.LENGTH_SHORT).show()
@@ -406,6 +411,8 @@ fun NavigationHost(
                         songs = songs,
                         currentSongId = currentSong?.id,
                         onSongClick = { song ->
+                            // Edge case: clicking a song in folder-B overlay stops old playback and starts new
+                            // openPlayer already handles clearing the old song and selecting the new one
                             openPlayer(song)
                         },
                         onPinnedTrackClick = { song ->

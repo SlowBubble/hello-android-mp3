@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class PlayerOverlay {
     NONE,
     HOME,
-    HIDDEN
+    HIDDEN,
+    FOLDER_SWITCH
 }
 
 class PlayerViewModel : ViewModel() {
@@ -62,6 +63,10 @@ class PlayerViewModel : ViewModel() {
 
     fun showHiddenOverlay() {
         _overlay.value = PlayerOverlay.HIDDEN
+    }
+
+    fun showFolderSwitchOverlay() {
+        _overlay.value = PlayerOverlay.FOLDER_SWITCH
     }
 
     fun dismissOverlay() {
