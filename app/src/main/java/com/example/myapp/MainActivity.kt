@@ -181,6 +181,51 @@ fun NavigationHost(
         return playerViewModel.isSelectionCurrent(song.id, selectionToken)
     }
 
+    /**
+     * M8e: Cycle to the next folder that actually contains MP3s.
+     *
+     * Folders with no MP3s are skipped and we keep cycling forward. The current
+     * folder index only moves when a non-empty folder is found, so the UI never
+     * ends up pointing at an empty folder while still showing the old songs.
+     */
+    fun switchToNextFolder() {
+        val storageManager = com.example.myapp.data.StorageManager(context)
+        val history = storageManager.getFolderHistory()
+
+        // Need more than one folder to cycle; otherwise there's nowhere to go.
+        if (history.size <= 1) return
+
+        // Skip "All" when cycling — only advance through real folders.
+        storageManager.setShowAllFolders(false)
+
+        val currentIdx = storageManager.getCurrentFolderIndex()
+        val scanner = SongScanner(context)
+
+        // Walk forward through every other folder, skipping any with no MP3s.
+        val foldersToCheck = history.size - 1
+        var nextIdx = currentIdx
+        var foundSongs: List<Song> = emptyList()
+        var checkedCount = 0
+        while (foundSongs.isEmpty() && checkedCount < foldersToCheck) {
+            nextIdx = (nextIdx + 1) % history.size
+            checkedCount++
+            try {
+                foundSongs = scanner.scanFolderForMp3s(history[nextIdx])
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Switch folder error at index $nextIdx", e)
+                // Keep cycling — a folder that errors out is treated like an empty one.
+            }
+        }
+
+        if (foundSongs.isNotEmpty()) {
+            storageManager.setCurrentFolderIndex(nextIdx)
+            playerViewModel.setSongs(foundSongs)
+            playerViewModel.clearCurrentSong()
+        } else {
+            Toast.makeText(context, "No MP3 files found in other folders", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     if (currentSong == null) {
         NavHost(navController = navController, startDestination = "start") {
             composable("start") {
@@ -216,34 +261,7 @@ fun NavigationHost(
                     onFolderButtonClick = {
                         folderPickerLauncher.launch(null)
                     },
-                    onSwitchButtonClick = {
-                        val storageManager = com.example.myapp.data.StorageManager(context)
-                        val history = storageManager.getFolderHistory()
-
-                        if (history.size > 1) {
-                            // Skip "All" when cycling — only advance through real folders
-                            val currentIdx = storageManager.getCurrentFolderIndex()
-                            storageManager.setShowAllFolders(false)
-                            val nextIdx = (currentIdx + 1) % history.size
-
-                            try {
-                                val scanner = SongScanner(context)
-                                val nextFolderUri = history[nextIdx]
-                                storageManager.setCurrentFolderIndex(nextIdx)
-                                val found = scanner.scanFolderForMp3s(nextFolderUri)
-
-                                if (found.isNotEmpty()) {
-                                    playerViewModel.setSongs(found)
-                                    playerViewModel.clearCurrentSong()
-                                } else {
-                                    Toast.makeText(context, "No MP3 files found", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Log.e("MainActivity", "Switch folder error", e)
-                                Toast.makeText(context, "Error loading folder: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
+                    onSwitchButtonClick = { switchToNextFolder() },
                     onSongsDeleted = { deletedSongs ->
                         playerViewModel.removeSongs(deletedSongs)
                     },
@@ -342,34 +360,7 @@ fun NavigationHost(
                         onFolderButtonClick = {
                             folderPickerLauncher.launch(null)
                         },
-                        onSwitchButtonClick = {
-                            val storageManager = com.example.myapp.data.StorageManager(context)
-                            val history = storageManager.getFolderHistory()
-
-                            if (history.size > 1) {
-                                // Skip "All" when cycling — only advance through real folders
-                                val currentIdx = storageManager.getCurrentFolderIndex()
-                                storageManager.setShowAllFolders(false)
-                                val nextIdx = (currentIdx + 1) % history.size
-
-                                try {
-                                    val scanner = SongScanner(context)
-                                    val nextFolderUri = history[nextIdx]
-                                    storageManager.setCurrentFolderIndex(nextIdx)
-                                    val found = scanner.scanFolderForMp3s(nextFolderUri)
-
-                                    if (found.isNotEmpty()) {
-                                        playerViewModel.setSongs(found)
-                                        playerViewModel.clearCurrentSong()
-                                    } else {
-                                        Toast.makeText(context, "No MP3 files found", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("MainActivity", "Switch folder error", e)
-                                    Toast.makeText(context, "Error loading folder: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
+                        onSwitchButtonClick = { switchToNextFolder() },
                         onSongsDeleted = { deletedSongs ->
                             playerViewModel.removeSongs(deletedSongs)
                         },

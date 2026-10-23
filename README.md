@@ -1,6 +1,12 @@
 
-# m8e
+# m8g
+- How hard is it to keep the player playing when I'm cycling thru folders in the home page?
+
+# m8f
 - add a button to the left of Sort in the homepage that remove the current folder from the cycling and then cycle to the next selected folder
+
+# m8e
+- When cycling thru folders, if there is no mp3 found for a particular folder, just skip that one and cycle to the next
 
 # m8d
 - for cycling through folders, let's skip the "All"
