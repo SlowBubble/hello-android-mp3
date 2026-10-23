@@ -296,6 +296,29 @@ class StorageManager(private val context: Context) {
 
     fun isShowAllFolders(): Boolean = prefs.getBoolean(KEY_SHOW_ALL_FOLDERS, false)
 
+    fun removeFolderFromHistory(index: Int) {
+        val history = getFolderHistory().toMutableList()
+        if (index >= 0 && index < history.size) {
+            history.removeAt(index)
+            try {
+                val stored = json.encodeToString(history)
+                val currentIdx = getCurrentFolderIndex()
+                // Adjust current index if needed
+                val newIdx = when {
+                    history.isEmpty() -> 0
+                    currentIdx >= history.size -> history.size - 1
+                    else -> currentIdx
+                }
+                prefs.edit()
+                    .putString(KEY_FOLDER_HISTORY, stored)
+                    .putInt(KEY_CURRENT_FOLDER_INDEX, newIdx)
+                    .apply()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     // ============== Playback Statistics ==============
     fun updateLastPlayedDate(song: Song) {
         val progress = getTrackProgress(song) ?: TrackProgress(trackName = song.title, trackId = song.id)

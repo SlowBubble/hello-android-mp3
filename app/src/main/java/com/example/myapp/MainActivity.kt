@@ -226,6 +226,59 @@ fun NavigationHost(
         }
     }
 
+    fun removeCurrentFolderAndCycle() {
+        val storageManager = com.example.myapp.data.StorageManager(context)
+        val history = storageManager.getFolderHistory()
+
+        // Need at least one folder to be left
+        if (history.isEmpty()) {
+            Toast.makeText(context, "No folders to remove", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val currentIdx = storageManager.getCurrentFolderIndex()
+        storageManager.removeFolderFromHistory(currentIdx)
+
+        val updatedHistory = storageManager.getFolderHistory()
+        if (updatedHistory.isEmpty()) {
+            Toast.makeText(context, "Removed last folder. Please add a new one.", Toast.LENGTH_SHORT).show()
+            playerViewModel.setSongs(emptyList())
+            playerViewModel.clearCurrentSong()
+            return
+        }
+
+        // After removal, cycle to the next available folder with songs
+        val scanner = SongScanner(context)
+        val newIdx = storageManager.getCurrentFolderIndex()
+        var foundSongs: List<Song> = emptyList()
+        var checkedCount = 0
+        var nextIdx = newIdx
+
+        // Try to find a folder with songs, checking up to the number of remaining folders
+        while (foundSongs.isEmpty() && checkedCount < updatedHistory.size) {
+            try {
+                foundSongs = scanner.scanFolderForMp3s(updatedHistory[nextIdx])
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Remove folder scan error at index $nextIdx", e)
+            }
+            if (foundSongs.isEmpty() && checkedCount < updatedHistory.size - 1) {
+                nextIdx = (nextIdx + 1) % updatedHistory.size
+                checkedCount++
+            } else {
+                break
+            }
+        }
+
+        if (foundSongs.isNotEmpty()) {
+            storageManager.setCurrentFolderIndex(nextIdx)
+            playerViewModel.setSongs(foundSongs)
+            playerViewModel.clearCurrentSong()
+            Toast.makeText(context, "Removed folder, switched to next", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "No MP3 files found in remaining folders", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     if (currentSong == null) {
         NavHost(navController = navController, startDestination = "start") {
             composable("start") {
@@ -262,6 +315,7 @@ fun NavigationHost(
                         folderPickerLauncher.launch(null)
                     },
                     onSwitchButtonClick = { switchToNextFolder() },
+                    onRemoveCurrentFolderClick = { removeCurrentFolderAndCycle() },
                     onSongsDeleted = { deletedSongs ->
                         playerViewModel.removeSongs(deletedSongs)
                     },
@@ -361,6 +415,7 @@ fun NavigationHost(
                             folderPickerLauncher.launch(null)
                         },
                         onSwitchButtonClick = { switchToNextFolder() },
+                        onRemoveCurrentFolderClick = { removeCurrentFolderAndCycle() },
                         onSongsDeleted = { deletedSongs ->
                             playerViewModel.removeSongs(deletedSongs)
                         },

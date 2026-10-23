@@ -156,6 +156,7 @@ fun SongListScreen(
     onPinnedTrackClick: ((Song) -> Unit)? = null,
     onFolderButtonClick: (() -> Unit)? = null,
     onSwitchButtonClick: (() -> Unit)? = null,
+    onRemoveCurrentFolderClick: (() -> Unit)? = null,
     onSongsDeleted: ((List<Song>) -> Unit)? = null,
     folderDisplayName: String = "Switch",
     isShowingAllFolders: Boolean = false,
@@ -307,13 +308,25 @@ fun SongListScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Row 1: Folder | Hidden
+                        // Row 1: Remove Folder | Folder | Hidden
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            Button(
+                                onClick = { onRemoveCurrentFolderClick?.invoke() },
+                                modifier = Modifier
+                                    .size(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFFF4444).copy(alpha = 0.2f)
+                                ),
+                                enabled = onRemoveCurrentFolderClick != null,
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("✕", fontSize = 20.sp, color = Color.White)
+                            }
                             Button(
                                 onClick = { onFolderButtonClick?.invoke() },
                                 modifier = Modifier
