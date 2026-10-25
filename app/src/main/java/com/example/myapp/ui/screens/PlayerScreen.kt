@@ -192,7 +192,7 @@ fun PlayerScreen(
         // duration into the previous track's persisted progress.
         playerViewModel.setLastLoadedSongUri(nextUri)
         playerViewModel.setCurrentSong(nextSong)
-        playerViewModel.setIsPlaying(true)
+        // Don't manually set playing state - let the service emit it when play() is called
 
         service?.let { svc ->
             svc.loadUri(nextUri)
@@ -230,6 +230,9 @@ fun PlayerScreen(
                     service = binder.getService()
                     connected = true
                     relativeVolumePercent = service?.getRelativeVolumePercent() ?: 100
+
+                    // Tell ViewModel to start collecting from service's isPlayingState
+                    service?.let { playerViewModel.setPlayerService(it) }
 
                     // Remove any previous listener before adding a new one
                     if (currentPlayerListener != null) {

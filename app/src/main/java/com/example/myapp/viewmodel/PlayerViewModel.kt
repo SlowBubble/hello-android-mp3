@@ -1,11 +1,14 @@
 package com.example.myapp.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.myapp.data.Song
 import com.example.myapp.data.TrackSession
+import com.example.myapp.service.PlayerService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class PlayerOverlay {
     NONE,
@@ -30,6 +33,9 @@ class PlayerViewModel : ViewModel() {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    // Reference to the service (set when available)
+    private var playerService: PlayerService? = null
 
     private val _currentPosition = MutableStateFlow(0L)
     val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
@@ -113,6 +119,18 @@ class PlayerViewModel : ViewModel() {
         if (songId == null) {
             _currentSong.value = null
         }
+    }
+
+    fun setPlayerService(service: PlayerService) {
+        playerService = service
+        // Start collecting from the service's isPlayingState
+        viewModelScope.launch {
+            service.isPlayingState.collect { isPlayingFromService ->
+                _isPlaying.value = isPlayingFromService
+            }
+        }
+        // Sync the current state immediately
+        _isPlaying.value = service.isPlaying()
     }
 
     fun setIsPlaying(playing: Boolean) {

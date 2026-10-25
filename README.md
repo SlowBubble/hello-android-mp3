@@ -1,3 +1,6 @@
+# m9d
+- Remove the sort button in the player page and replace it with a random checkbox to decide if the Next button will follow the order set in the homepage or to randomly select the next track from the tracks that are not playing currently.
+
 # m9c
 - Sometimes, the track is paused/played from a different place instead of tapping on the player page, but the page doesn't switch from red to green (and vice versa). Propose options to fix this.
 

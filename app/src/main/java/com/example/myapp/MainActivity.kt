@@ -394,10 +394,10 @@ fun NavigationHost(
                 onPlayPause = { service ->
                     if (isPlaying) {
                         service.pause()
-                        playerViewModel.setIsPlaying(false)
+                        // Don't manually set ViewModel state - let the service state propagate back
                     } else {
                         service.play()
-                        playerViewModel.setIsPlaying(true)
+                        // Don't manually set ViewModel state - let the service state propagate back
                     }
                 },
                 onRewind = { service ->

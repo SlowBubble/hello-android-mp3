@@ -16,6 +16,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.ui.PlayerNotificationManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 @UnstableApi
 class PlayerService : Service() {
@@ -30,6 +33,10 @@ class PlayerService : Service() {
     private var relativeVolumePercent = 100
     private val notificationId = 1001
     private val channelId = "audio_playback_channel"
+    
+    // Bi-directional state: PlayerService is the source of truth
+    private val _isPlayingState = MutableStateFlow(false)
+    val isPlayingState: StateFlow<Boolean> = _isPlayingState.asStateFlow()
     private val playbackLogger = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             logPlaybackState("playbackStateChanged state=$playbackState")
@@ -37,10 +44,12 @@ class PlayerService : Service() {
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             logPlaybackState("playWhenReadyChanged value=$playWhenReady reason=$reason")
+            syncPlayingState()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             logPlaybackState("isPlayingChanged value=$isPlaying")
+            syncPlayingState()
         }
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -57,6 +66,9 @@ class PlayerService : Service() {
         android.util.Log.d("PlayerService", "onCreate pid=${android.os.Process.myPid()} service=${System.identityHashCode(this)}")
         exoPlayer = ExoPlayer.Builder(this).build()
         exoPlayer.addListener(playbackLogger)
+        
+        // Sync initial playing state
+        syncPlayingState()
         
         // Create notification channel for Android O and above
         createNotificationChannel()
@@ -141,6 +153,10 @@ class PlayerService : Service() {
     override fun onRebind(intent: Intent?) {
         super.onRebind(intent)
         logPlaybackState("onRebind action=${intent?.action}")
+    }
+    
+    private fun syncPlayingState() {
+        _isPlayingState.value = exoPlayer.isPlaying
     }
     
     private fun createNotificationChannel() {
