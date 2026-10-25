@@ -1,9 +1,9 @@
-# m9f
-- Let's remove the +10% volume button and have the -10% be -20% instead and cycles back to 100% instead of 0%.
-- In it's place, have a button to that (similar to the homepage) shows the current folder and switch folder in the player page that switch folder and automatically resume playing the track in that new folder (similar to m9b)
 
-# m9e
+# m9f
 - New criteria for hiding tracks vs deleting
+# m9e
+- Let's remove the +10% volume button and the volume display and have the -10% still be a button but cycles between 100%, 75%, 50% and 25% and display the volume.
+- In the place of the +10%, have a button to that (similar to the homepage) shows the current folder and switch folder in the player page that switch folder and automatically resume playing the track in that new folder (similar to m9b)
 
 # m9d
 - Remove the sort button in the player page and replace it with a random checkbox to decide if the Next button will follow the order set in the homepage or to randomly select the next track from the tracks that are not playing currently.

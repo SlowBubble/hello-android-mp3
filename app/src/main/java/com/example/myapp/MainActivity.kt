@@ -444,7 +444,8 @@ fun NavigationHost(
                     playerViewModel.selectSong(nextSong, playing = true)
                     playerViewModel.dismissOverlay()
                 },
-                onQueueEnded = { onQueueEnded() }
+                onQueueEnded = { onQueueEnded() },
+                onSwitchFolder = { switchToNextFolder() }
             )
 
             if (overlay != com.example.myapp.viewmodel.PlayerOverlay.NONE) {

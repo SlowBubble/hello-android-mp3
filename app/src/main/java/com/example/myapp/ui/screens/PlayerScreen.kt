@@ -51,6 +51,7 @@ fun PlayerScreen(
     onTrackHideAndNext: (nextSong: Song) -> Unit = {},
     onSkipToNext: (nextSong: Song) -> Unit = {},
     onQueueEnded: () -> Unit = {},
+    onSwitchFolder: () -> Unit = {},
     playerViewModel: com.example.myapp.viewmodel.PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -715,14 +716,24 @@ fun PlayerScreen(
                     }
                 }
 
-                // Adjust app playback gain independently of the device volume.
+                // Volume control and folder switch
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Volume cycling button: 100% -> 75% -> 50% -> 25% -> 100%
                     Button(
                         onClick = {
-                            service?.let { relativeVolumePercent = it.adjustRelativeVolume(-10) }
+                            service?.let { svc ->
+                                val volumeLevels = listOf(100, 75, 50, 25)
+                                val currentIndex = volumeLevels.indexOfFirst { it == relativeVolumePercent }
+                                val nextIndex = if (currentIndex == -1) 0 else (currentIndex + 1) % volumeLevels.size
+                                val nextVolume = volumeLevels[nextIndex]
+                                
+                                // Calculate the delta needed to reach the target volume
+                                val delta = nextVolume - relativeVolumePercent
+                                relativeVolumePercent = svc.adjustRelativeVolume(delta)
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -730,28 +741,26 @@ fun PlayerScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White.copy(alpha = 0.15f)
                         ),
-                        enabled = connected && relativeVolumePercent > 0
+                        enabled = connected
                     ) {
-                        Text("-10%", fontSize = 16.sp, color = Color.White)
+                        Text("🔊 $relativeVolumePercent%", fontSize = 16.sp, color = Color.White)
                     }
-                    Text(
-                        "Vol: $relativeVolumePercent",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+                    
+                    // Folder switch button
                     Button(
                         onClick = {
-                            service?.let { relativeVolumePercent = it.adjustRelativeVolume(10) }
+                            saveProgress()
+                            onSwitchFolder()
                         },
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White.copy(alpha = 0.15f)
-                        ),
-                        enabled = connected && relativeVolumePercent < 100
+                        )
                     ) {
-                        Text("+10%", fontSize = 16.sp, color = Color.White)
+                        val folderName = storageManager.getCurrentFolderDisplayName()
+                        Text("📁 $folderName", fontSize = 14.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
