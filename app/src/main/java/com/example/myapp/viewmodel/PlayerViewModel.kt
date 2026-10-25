@@ -64,6 +64,15 @@ class PlayerViewModel : ViewModel() {
     private val _overlay = MutableStateFlow(PlayerOverlay.NONE)
     val overlay: StateFlow<PlayerOverlay> = _overlay.asStateFlow()
 
+    // M9f: Signal when tracks are deleted during auto-completion
+    // Incremented each time a track is hidden/deleted, triggers SongListScreen refresh
+    private val _tracksDeletedSignal = MutableStateFlow(0)
+    val tracksDeletedSignal: StateFlow<Int> = _tracksDeletedSignal.asStateFlow()
+
+    fun signalTracksDeleted() {
+        _tracksDeletedSignal.value++
+    }
+
     fun showHomeOverlay() {
         _overlay.value = PlayerOverlay.HOME
     }

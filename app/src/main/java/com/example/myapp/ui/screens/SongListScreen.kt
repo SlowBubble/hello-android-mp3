@@ -163,6 +163,7 @@ fun SongListScreen(
     isHiddenOverlay: Boolean? = null,
     onShowHome: (() -> Unit)? = null,
     onShowHidden: (() -> Unit)? = null,
+    playerViewModel: com.example.myapp.viewmodel.PlayerViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -178,6 +179,14 @@ fun SongListScreen(
     val showHidden = isHiddenOverlay ?: localShowHidden
     var visibleCount by remember { mutableIntStateOf(30) }
     var hiddenTracksRefresh by remember { mutableIntStateOf(0) }
+
+    // M9f: Observe tracksDeletedSignal from PlayerViewModel to refresh hidden tracks when auto-completion hides tracks
+    LaunchedEffect(playerViewModel) {
+        playerViewModel?.tracksDeletedSignal?.collect { signal ->
+            hiddenTracksRefresh++
+            Log.d("SongListScreen", "M9f: Received tracksDeletedSignal=$signal, incremented hiddenTracksRefresh to $hiddenTracksRefresh")
+        }
+    }
 
     val hiddenTracks = remember(showHidden, songs, hiddenTracksRefresh) {
         storageManager.getHiddenTracks()

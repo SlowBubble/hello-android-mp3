@@ -434,7 +434,8 @@ fun NavigationHost(
                         playerViewModel.removeSongs(deletedSongs)
                     },
                     folderDisplayName = folderDisplayName,
-                    isShowingAllFolders = isShowingAllFolders
+                    isShowingAllFolders = isShowingAllFolders,
+                    playerViewModel = playerViewModel
                 )
             }
         }

@@ -231,6 +231,8 @@ fun PlayerScreen(
                     Log.d("PlayerScreen", "Track is not bookmarked, hiding and deleting")
                     storageManager.hideTrack(song)
                     storageManager.deleteSong(song)
+                    // M9f: Signal SongListScreen to refresh its hidden tracks
+                    playerViewModel.signalTracksDeleted()
                 }
 
                 val nextSong = getNextTrackInSortOrder()
@@ -335,6 +337,14 @@ fun PlayerScreen(
 
                 if (alreadyLoaded && alreadyPlaying) {
                     // Navigated back to the same song that is actively playing — do nothing
+                    return@LaunchedEffect
+                }
+
+                // M9f: Check if this track is in the hidden list (deleted) — skip if so
+                val hiddenTracks = storageManager.getHiddenTracks()
+                if (hiddenTracks.contains(song.title)) {
+                    Log.d("PlayerScreen", "Skipping deleted/hidden track: ${song.title}")
+                    onQueueEnded()
                     return@LaunchedEffect
                 }
 

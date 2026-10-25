@@ -6,6 +6,11 @@
 # m9f
 - Fixed deletion behavior: All X buttons (homepage, hidden page, and player page) now properly hide tracks from the UI immediately before deleting the file. This prevents "ghost tracks" that were deleted but still appeared in the UI, which was causing m9a and m9b to malfunction.
 - Bookmarked tracks are preserved: When a track finishes naturally, bookmarked tracks are only hidden (not deleted) so they can be replayed later.
+- **UI refresh fix**: When a track finishes naturally (auto-completion), the player now signals the homepage to refresh its hidden tracks list. Previously, completed tracks would disappear from the player but remain visible in the homepage, causing the player to get stuck when trying to play them. This is now fixed by:
+  1. PlayerScreen calling `playerViewModel.signalTracksDeleted()` after hiding/deleting a non-bookmarked track
+  2. SongListScreen observing `playerViewModel.tracksDeletedSignal` to increment its `hiddenTracksRefresh` counter
+  3. This forces SongListScreen to re-read the hidden tracks and rebuild the visible queue, removing completed tracks from display
+  4. As a safety measure, PlayerScreen also checks if a track is in the hidden list before loading, and skips it if so
 - Behavior summary:
   - **X button on homepage**: Hides track from UI, then deletes the file from disk
   - **X button on hidden page**: Hides track from UI, then deletes the file from disk
