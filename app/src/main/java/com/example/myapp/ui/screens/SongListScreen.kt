@@ -180,6 +180,10 @@ fun SongListScreen(
     var visibleCount by remember { mutableIntStateOf(30) }
     var hiddenTracksRefresh by remember { mutableIntStateOf(0) }
 
+    // M9f Refactor: Observe playerViewModel.hiddenTracks instead of calling storageManager.getHiddenTracks()
+    // This ensures we stay in sync with the ViewModel's computed hiddenTracks
+    val viewModelHiddenTracks = playerViewModel?.hiddenTracks?.collectAsState()?.value ?: emptySet()
+    
     // M9f: Observe tracksDeletedSignal from PlayerViewModel to refresh hidden tracks when auto-completion hides tracks
     LaunchedEffect(playerViewModel) {
         playerViewModel?.tracksDeletedSignal?.collect { signal ->
@@ -188,8 +192,13 @@ fun SongListScreen(
         }
     }
 
-    val hiddenTracks = remember(showHidden, songs, hiddenTracksRefresh) {
-        storageManager.getHiddenTracks()
+    val hiddenTracks = remember(showHidden, songs, hiddenTracksRefresh, viewModelHiddenTracks) {
+        // M9f Refactor: Use ViewModel's hiddenTracks if available, otherwise fall back to storage
+        if (playerViewModel != null) {
+            viewModelHiddenTracks
+        } else {
+            storageManager.getHiddenTracks().toSet()
+        }
     }
     var bookmarkedTitles by remember(showHidden, songs) {
         mutableStateOf(if (showHidden) storageManager.getBookmarkedTitles() else emptyList())
@@ -199,7 +208,7 @@ fun SongListScreen(
         QueueUtils.buildVisibleQueue(
             songs = songs,
             sortMode = sortMode,
-            hiddenTrackKeys = hiddenTracks,
+            hiddenTrackKeys = hiddenTracks.toList(),
             currentSongId = currentSongId,
             randomSortSeed = randomSortSeed
         )
@@ -209,7 +218,7 @@ fun SongListScreen(
         QueueUtils.buildHiddenQueue(
             songs = songs,
             sortMode = sortMode,
-            hiddenTrackKeys = hiddenTracks,
+            hiddenTrackKeys = hiddenTracks.toList(),
             randomSortSeed = randomSortSeed
         )
     }
@@ -521,24 +530,37 @@ fun SongListScreen(
                                     } else {
                                         // Normal song click logic
                                         // M4e: Auto-unhide if playing from hidden page
-                                        if (showHidden) {
-                                            storageManager.unhideTrack(song)
+                                        if (showHidden && playerViewModel != null) {
+                                            playerViewModel.showTrack(song, storageManager)
                                             hiddenTracksRefresh++
                                         }
                                         onSongClick(song)
                                     }
                                 },
                                 onHideClick = {
-                                    storageManager.hideTrack(song)
+                                    if (playerViewModel != null) {
+                                        playerViewModel.hideTrack(song, storageManager)
+                                    } else {
+                                        storageManager.hideTrack(song)
+                                    }
                                     hiddenTracksRefresh++
                                 },
                                 onRestoreClick = {
-                                    storageManager.unhideTrack(song)
+                                    if (playerViewModel != null) {
+                                        playerViewModel.showTrack(song, storageManager)
+                                    } else {
+                                        storageManager.unhideTrack(song)
+                                    }
                                     hiddenTracksRefresh++
                                 },
                                 onDeleteClick = {
-                                    storageManager.hideTrack(song)
-                                    storageManager.deleteSong(song)
+                                    if (playerViewModel != null) {
+                                        playerViewModel.hideTrack(song, storageManager)
+                                        playerViewModel.deleteSong(song, storageManager)
+                                    } else {
+                                        storageManager.hideTrack(song)
+                                        storageManager.deleteSong(song)
+                                    }
                                     onSongsDeleted?.invoke(listOf(song))
                                     hiddenTracksRefresh++
                                 },

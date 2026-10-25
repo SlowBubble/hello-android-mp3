@@ -5,9 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapp.data.Song
 import com.example.myapp.data.TrackSession
 import com.example.myapp.service.PlayerService
+import com.example.myapp.ui.screens.QueueUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 enum class PlayerOverlay {
@@ -22,11 +26,40 @@ class PlayerViewModel : ViewModel() {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
 
+    // M9f Refactor: hiddenTracks now managed by ViewModel
+    private val _hiddenTracks = MutableStateFlow<Set<String>>(emptySet())
+    val hiddenTracks: StateFlow<Set<String>> = _hiddenTracks.asStateFlow()
+
+    // M9f Refactor: sortMode and randomSeed managed by ViewModel for visible queue computation
+    private val _sortMode = MutableStateFlow(0)
+    val sortMode: StateFlow<Int> = _sortMode.asStateFlow()
+
+    private val _randomSortSeed = MutableStateFlow(0L)
+    val randomSortSeed: StateFlow<Long> = _randomSortSeed.asStateFlow()
+
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
 
     private val _currentSongId = MutableStateFlow<Long?>(null)
     val currentSongId: StateFlow<Long?> = _currentSongId.asStateFlow()
+
+    // M9f Refactor: Computed visible songs list derived from songs, hiddenTracks, sortMode, and randomSeed
+    // This is the single source of truth for the playable queue
+    val visibleSongs: StateFlow<List<Song>> = combine(
+        _songs,
+        _hiddenTracks,
+        _sortMode,
+        _randomSortSeed,
+        _currentSongId
+    ) { songs, hidden, sortMode, seed, currentSongId ->
+        QueueUtils.buildVisibleQueue(
+            songs = songs,
+            sortMode = sortMode,
+            hiddenTrackKeys = hidden,
+            currentSongId = currentSongId,
+            randomSortSeed = seed
+        )
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _currentTrackSession = MutableStateFlow<TrackSession?>(null)
     val currentTrackSession: StateFlow<TrackSession?> = _currentTrackSession.asStateFlow()
@@ -95,6 +128,47 @@ class PlayerViewModel : ViewModel() {
 
     fun setSongs(newSongs: List<Song>) {
         _songs.value = newSongs
+    }
+
+    // M9f Refactor: setSortMode updates the sort preference
+    fun setSortMode(sortMode: Int) {
+        _sortMode.value = sortMode
+    }
+
+    // M9f Refactor: setRandomSortSeed updates the random seed for shuffle mode
+    fun setRandomSortSeed(seed: Long) {
+        _randomSortSeed.value = seed
+    }
+
+    // M9f Refactor: hideTrack removes a track from the visible queue by adding it to hiddenTracks
+    // and removing it from the songs list, then persists the change
+    fun hideTrack(song: Song, storageManager: com.example.myapp.data.StorageManager) {
+        // Add to hidden tracks (triggers visibleSongs recomputation)
+        _hiddenTracks.value = _hiddenTracks.value + song.title
+        
+        // Remove from songs list
+        _songs.value = _songs.value.filterNot { it.matches(song) }
+        
+        // Persist to storage asynchronously
+        viewModelScope.launch {
+            storageManager.hideTrack(song)
+        }
+    }
+
+    // M9f Refactor: showTrack removes a track from the hidden list (unhides it)
+    fun showTrack(song: Song, storageManager: com.example.myapp.data.StorageManager) {
+        _hiddenTracks.value = _hiddenTracks.value - song.title
+        
+        viewModelScope.launch {
+            storageManager.unhideTrack(song)
+        }
+    }
+
+    // M9f Refactor: deleteSong persists deletion to storage
+    fun deleteSong(song: Song, storageManager: com.example.myapp.data.StorageManager) {
+        viewModelScope.launch {
+            storageManager.deleteSong(song)
+        }
     }
 
     fun removeSongs(deleted: Collection<Song>) {

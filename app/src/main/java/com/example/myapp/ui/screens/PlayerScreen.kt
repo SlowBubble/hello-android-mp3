@@ -66,16 +66,19 @@ fun PlayerScreen(
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
     
+    // Collect visibleSongs from ViewModel (computed derived state)
+    val visibleSongs by playerViewModel.visibleSongs.collectAsState()
+    
     // Track the current folder name reactively based on the songs list
     val currentFolderName by remember(songs) {
         mutableStateOf(storageManager.getCurrentFolderDisplayName())
     }
     
-    // Read the sort mode from storage to maintain consistency with homepage order
-    val playerQueueSortMode by remember {
-        mutableIntStateOf(storageManager.getSortIndex())
+    // M9f Refactor: Initialize ViewModel sort mode and seed from storage on first load
+    LaunchedEffect(Unit) {
+        playerViewModel.setSortMode(storageManager.getSortIndex())
+        playerViewModel.setRandomSortSeed(storageManager.getRandomSortSeed())
     }
-    var randomSortSeed by remember { mutableLongStateOf(storageManager.getRandomSortSeed()) }
     
     // Random checkbox state - controls whether Next button follows order or picks randomly
     var useRandomNext by remember { mutableStateOf(false) }
@@ -93,32 +96,18 @@ fun PlayerScreen(
     var trackEndedHandled by remember { mutableStateOf(false) }
     var currentPlayerListener by remember { mutableStateOf<Player.Listener?>(null) }
 
-    // Helper function to get the next track in sorted order (ignoring the pinned track)
-    fun getVisibleQueue(): List<Song> {
-        val activeSongId = currentVmSongId ?: song.id
-        // Always read current hidden tracks from StorageManager, not the stale parameter
-        val currentHiddenTracks = storageManager.getHiddenTracks()
-        return QueueUtils.buildVisibleQueue(
-            songs = songs,
-            sortMode = playerQueueSortMode,
-            hiddenTrackKeys = currentHiddenTracks,
-            currentSongId = activeSongId,
-            randomSortSeed = randomSortSeed
-        )
-    }
-
+    // M9f Refactor: Use ViewModel's computed visibleSongs directly
     fun getNextTrackInSortOrder(): Song? {
-        val queue = getVisibleQueue()
         val activeSongId = currentVmSongId ?: song.id
         
         // If random checkbox is enabled, pick a random track from the queue (excluding current)
         if (useRandomNext) {
-            val availableTracks = queue.filter { it.id != activeSongId }
+            val availableTracks = visibleSongs.filter { it.id != activeSongId }
             return availableTracks.randomOrNull()
         }
         
         // Otherwise, follow the set order from the homepage
-        return QueueUtils.nextTrack(queue, activeSongId)
+        return QueueUtils.nextTrack(visibleSongs, activeSongId)
     }
 
     // Helper function to save progress
@@ -181,10 +170,9 @@ fun PlayerScreen(
             // Save progress and optionally hide the current track before switching folders
             saveProgressForSong(previousSong)
             if (hideCurrent) {
-                storageManager.hideTrack(previousSong)
-                storageManager.deleteSong(previousSong)
-                // M9f: Update ViewModel's songs list to remove the deleted track
-                playerViewModel.removeSongs(listOf(previousSong))
+                // M9f Refactor: Use ViewModel method which updates both hidden list and songs list
+                playerViewModel.hideTrack(previousSong, storageManager)
+                playerViewModel.deleteSong(previousSong, storageManager)
             }
             onQueueEnded()
             return
@@ -201,11 +189,9 @@ fun PlayerScreen(
         saveProgressForSong(previousSong)
 
         if (hideCurrent) {
-            storageManager.hideTrack(previousSong)
-            storageManager.deleteSong(previousSong)
-            // M9f: Update ViewModel's songs list to remove the deleted track
-            // This ensures getVisibleQueue() recomputes with the correct set of songs
-            playerViewModel.removeSongs(listOf(previousSong))
+            // M9f Refactor: Use ViewModel method which updates both hidden list and songs list
+            playerViewModel.hideTrack(previousSong, storageManager)
+            playerViewModel.deleteSong(previousSong, storageManager)
         }
 
         // Advance the active song before the service switch so any stale delayed saves
@@ -231,14 +217,11 @@ fun PlayerScreen(
                 // If bookmarked, only hide (preserve file); otherwise hide and delete
                 if (isBookmarked) {
                     Log.d("PlayerScreen", "Track is bookmarked, hiding only (not deleting)")
-                    storageManager.hideTrack(song)
+                    playerViewModel.hideTrack(song, storageManager)
                 } else {
                     Log.d("PlayerScreen", "Track is not bookmarked, hiding and deleting")
-                    storageManager.hideTrack(song)
-                    storageManager.deleteSong(song)
-                    // M9f: Update ViewModel's songs list to remove the deleted track
-                    // This ensures getVisibleQueue() recomputes with the correct set of songs
-                    playerViewModel.removeSongs(listOf(song))
+                    playerViewModel.hideTrack(song, storageManager)
+                    playerViewModel.deleteSong(song, storageManager)
                     // M9f: Signal SongListScreen to refresh its hidden tracks
                     playerViewModel.signalTracksDeleted()
                 }
@@ -348,8 +331,8 @@ fun PlayerScreen(
                     return@LaunchedEffect
                 }
 
-                // M9f: Check if this track is in the hidden list (deleted) — skip if so
-                val hiddenTracks = storageManager.getHiddenTracks()
+                // M9f Refactor: Check if this track is in the hidden list (deleted) — skip if so
+                val hiddenTracks = playerViewModel.hiddenTracks.value
                 if (hiddenTracks.contains(song.title)) {
                     Log.d("PlayerScreen", "Skipping deleted/hidden track: ${song.title}")
                     onQueueEnded()
