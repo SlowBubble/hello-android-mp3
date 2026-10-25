@@ -230,6 +230,66 @@ fun NavigationHost(
         }
     }
 
+    /**
+     * M9e: Switch folder from player page - stay on player and resume last played track
+     * If returning to a folder, resumes the track that was playing before.
+     * If visiting a new folder, plays the first track.
+     */
+    fun switchToNextFolderFromPlayer() {
+        val storageManager = com.example.myapp.data.StorageManager(context)
+        val history = storageManager.getFolderHistory()
+
+        // Need more than one folder to cycle
+        if (history.size <= 1) {
+            Toast.makeText(context, "No other folders available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Save the current track as the last active track for the current folder
+        val currentFolderUri = storageManager.getCurrentFolderUri()
+        val currentSong = playerViewModel.currentSong.value
+        if (currentFolderUri != null && currentSong != null) {
+            storageManager.setFolderLastTrack(currentFolderUri, currentSong)
+            Log.d("MainActivity", "Saved last track for current folder: ${currentSong.title}")
+        }
+
+        // Skip "All" when cycling
+        storageManager.setShowAllFolders(false)
+
+        val currentIdx = storageManager.getCurrentFolderIndex()
+        val scanner = SongScanner(context)
+
+        // Walk forward through folders, skipping any with no MP3s
+        val foldersToCheck = history.size - 1
+        var nextIdx = currentIdx
+        var foundSongs: List<Song> = emptyList()
+        var checkedCount = 0
+        while (foundSongs.isEmpty() && checkedCount < foldersToCheck) {
+            nextIdx = (nextIdx + 1) % history.size
+            checkedCount++
+            try {
+                foundSongs = scanner.scanFolderForMp3s(history[nextIdx])
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Switch folder from player error at index $nextIdx", e)
+            }
+        }
+
+        if (foundSongs.isNotEmpty()) {
+            // Switch to the next folder
+            val nextFolderUri = history[nextIdx]
+            storageManager.setCurrentFolderIndex(nextIdx)
+            playerViewModel.setSongs(foundSongs)
+            
+            // Try to resume the last active track from this folder, otherwise play first track
+            val resumeSong = storageManager.getFolderLastTrackSong(nextFolderUri, foundSongs) ?: foundSongs.first()
+            playerViewModel.selectSong(resumeSong, playing = true)
+            
+            Log.d("MainActivity", "Switched to folder at index $nextIdx, playing: ${resumeSong.title}")
+        } else {
+            Toast.makeText(context, "No MP3 files found in other folders", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun removeCurrentFolderAndCycle() {
         val storageManager = com.example.myapp.data.StorageManager(context)
         val history = storageManager.getFolderHistory()
@@ -445,7 +505,7 @@ fun NavigationHost(
                     playerViewModel.dismissOverlay()
                 },
                 onQueueEnded = { onQueueEnded() },
-                onSwitchFolder = { switchToNextFolder() }
+                onSwitchFolder = { switchToNextFolderFromPlayer() }
             )
 
             if (overlay != com.example.myapp.viewmodel.PlayerOverlay.NONE) {

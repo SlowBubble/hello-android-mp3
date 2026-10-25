@@ -24,6 +24,7 @@ class StorageManager(private val context: Context) {
         private const val KEY_SORT_INDEX = "sort_index"
         private const val KEY_RANDOM_SORT_SEED = "random_sort_seed"
         private const val KEY_LAST_ACTIVE_TRACK = "last_active_track"
+        private const val KEY_FOLDER_LAST_TRACK_PREFIX = "folder_last_track_"
         private const val KEY_FOLDER_URI = "folder_uri"
         private const val KEY_FOLDER_HISTORY = "folder_history"
         private const val KEY_CURRENT_FOLDER_INDEX = "current_folder_index"
@@ -188,6 +189,31 @@ class StorageManager(private val context: Context) {
 
     fun clearLastActiveTrack() {
         prefs.edit().remove(KEY_LAST_ACTIVE_TRACK).apply()
+    }
+
+    // ============== Per-Folder Last Active Track ==============
+    
+    /**
+     * Save the last active (pinned) track for a specific folder
+     * This allows resuming the exact track when switching back to a folder
+     */
+    fun setFolderLastTrack(folderUri: String, song: Song?) {
+        val key = "$KEY_FOLDER_LAST_TRACK_PREFIX$folderUri"
+        if (song == null) {
+            prefs.edit().remove(key).apply()
+        } else {
+            prefs.edit().putString(key, songKey(song)).apply()
+        }
+    }
+    
+    /**
+     * Get the last active track for a specific folder
+     * Returns the song if it exists in the provided songs list
+     */
+    fun getFolderLastTrackSong(folderUri: String, songs: List<Song>): Song? {
+        val key = "$KEY_FOLDER_LAST_TRACK_PREFIX$folderUri"
+        val trackKey = prefs.getString(key, null) ?: return null
+        return songs.find { songKey(it) == trackKey }
     }
 
     // ============== Sort Preference ==============

@@ -12,8 +12,14 @@
   - All deletions now ensure the track disappears from the UI immediately and won't reappear until the folder is re-scanned
 
 # m9e
-- Let's remove the +10% volume button and the volume display and have the -10% still be a button but cycles between 100%, 75%, 50% and 25% and display the volume.
-- In the place of the +10%, have a button to that (similar to the homepage) shows the current folder and switch folder in the player page that switch folder and automatically resume playing the track in that new folder (similar to m9b)
+- Volume control redesign: Removed the +10% button and separate volume display. The volume button now cycles through preset levels (100% → 75% → 50% → 25%) and displays the current volume (🔊 XX%).
+- Folder switcher in player: Added a folder switch button (📁 FolderName) that replaces the +10% button position. When clicked:
+  - Stays on the player page (doesn't navigate to homepage)
+  - Switches to the next folder with MP3 files
+  - **Per-folder resumption**: Remembers the last playing track for each folder. When switching back to a folder you were in before (e.g., A → B → A), it resumes the exact track and position from before
+  - If visiting a folder for the first time, plays the first track
+  - The button text updates reactively to show the current folder name
+- Technical implementation: Added per-folder last-track tracking via `setFolderLastTrack()` and `getFolderLastTrackSong()`. Each folder independently tracks which track was playing when you left it, combined with existing per-track position storage via `TrackProgress`
 
 # m9d
 - Remove the sort button in the player page and replace it with a random checkbox to decide if the Next button will follow the order set in the homepage or to randomly select the next track from the tracks that are not playing currently.

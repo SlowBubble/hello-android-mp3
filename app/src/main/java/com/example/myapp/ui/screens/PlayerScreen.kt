@@ -66,6 +66,11 @@ fun PlayerScreen(
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
     
+    // Track the current folder name reactively based on the songs list
+    val currentFolderName by remember(songs) {
+        mutableStateOf(storageManager.getCurrentFolderDisplayName())
+    }
+    
     // Read the sort mode from storage to maintain consistency with homepage order
     val playerQueueSortMode by remember {
         mutableIntStateOf(storageManager.getSortIndex())
@@ -767,8 +772,7 @@ fun PlayerScreen(
                             containerColor = Color.White.copy(alpha = 0.15f)
                         )
                     ) {
-                        val folderName = storageManager.getCurrentFolderDisplayName()
-                        Text("📁 $folderName", fontSize = 14.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("📁 $currentFolderName", fontSize = 14.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
