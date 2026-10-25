@@ -50,6 +50,7 @@ fun PlayerScreen(
     currentSongIndex: Int = 0,
     onTrackHideAndNext: (nextSong: Song) -> Unit = {},
     onSkipToNext: (nextSong: Song) -> Unit = {},
+    onQueueEnded: () -> Unit = {},
     playerViewModel: com.example.myapp.viewmodel.PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -200,12 +201,12 @@ fun PlayerScreen(
                     Log.d("PlayerScreen", "Advancing to next track: ${nextSong.title}")
                     onTrackHideAndNext(nextSong)
                 } else {
-                    Log.d("PlayerScreen", "No more tracks available, going back")
-                    onBack()
+                    Log.d("PlayerScreen", "No more tracks available, checking for next folder")
+                    onQueueEnded()
                 }
             } catch (e: Exception) {
                 Log.e("PlayerScreen", "Error auto-advancing to next track: ${e.message}", e)
-                onBack()
+                onQueueEnded()
             }
         }
     })

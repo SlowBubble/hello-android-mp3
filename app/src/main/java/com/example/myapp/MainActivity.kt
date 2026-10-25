@@ -284,6 +284,55 @@ fun NavigationHost(
         }
     }
 
+    /**
+     * M9b: When the final track of a folder ends, automatically switch to the next folder
+     * and play the first track from that folder. If there's only one folder or no more folders,
+     * return to the song list screen.
+     */
+    fun onQueueEnded() {
+        val storageManager = com.example.myapp.data.StorageManager(context)
+        val history = storageManager.getFolderHistory()
+
+        // If only one folder or no folders, go back to song list
+        if (history.size <= 1) {
+            navController.popBackStack()
+            return
+        }
+
+        // Try to find the next folder with songs
+        val currentIdx = storageManager.getCurrentFolderIndex()
+        val scanner = SongScanner(context)
+        var foundSongs: List<Song> = emptyList()
+        var nextIdx = currentIdx
+        var checkedCount = 0
+        val foldersToCheck = history.size - 1
+
+        while (foundSongs.isEmpty() && checkedCount < foldersToCheck) {
+            nextIdx = (nextIdx + 1) % history.size
+            checkedCount++
+            try {
+                foundSongs = scanner.scanFolderForMp3s(history[nextIdx])
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Auto-advance folder scan error at index $nextIdx", e)
+            }
+        }
+
+        if (foundSongs.isNotEmpty()) {
+            // Switch to the next folder
+            storageManager.setCurrentFolderIndex(nextIdx)
+            playerViewModel.setSongs(foundSongs)
+            
+            // Auto-play the first track from the new folder
+            val firstSong = foundSongs.first()
+            playerViewModel.selectSong(firstSong, playing = true)
+            Log.d("MainActivity", "Auto-advanced to next folder, playing: ${firstSong.title}")
+        } else {
+            // No more folders with songs, go back to song list
+            Log.d("MainActivity", "No more folders with songs, returning to song list")
+            navController.popBackStack()
+        }
+    }
+
     if (currentSong == null) {
         NavHost(navController = navController, startDestination = "start") {
             composable("start") {
@@ -394,7 +443,8 @@ fun NavigationHost(
                     playerViewModel.setLastLoadedSongUri("")
                     playerViewModel.selectSong(nextSong, playing = true)
                     playerViewModel.dismissOverlay()
-                }
+                },
+                onQueueEnded = { onQueueEnded() }
             )
 
             if (overlay != com.example.myapp.viewmodel.PlayerOverlay.NONE) {
