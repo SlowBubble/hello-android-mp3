@@ -175,6 +175,7 @@ fun PlayerScreen(
             // Save progress and optionally hide the current track before switching folders
             saveProgressForSong(previousSong)
             if (hideCurrent) {
+                storageManager.hideTrack(previousSong)
                 storageManager.deleteSong(previousSong)
             }
             onQueueEnded()
@@ -192,6 +193,7 @@ fun PlayerScreen(
         saveProgressForSong(previousSong)
 
         if (hideCurrent) {
+            storageManager.hideTrack(previousSong)
             storageManager.deleteSong(previousSong)
         }
 
@@ -214,6 +216,7 @@ fun PlayerScreen(
             try {
                 Log.d("PlayerScreen", "Track ended: ${song.title}")
                 saveProgress()
+                storageManager.hideTrack(song)
                 storageManager.deleteSong(song)
 
                 val nextSong = getNextTrackInSortOrder()
