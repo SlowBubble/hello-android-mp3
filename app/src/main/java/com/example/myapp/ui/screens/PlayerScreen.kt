@@ -183,6 +183,8 @@ fun PlayerScreen(
             if (hideCurrent) {
                 storageManager.hideTrack(previousSong)
                 storageManager.deleteSong(previousSong)
+                // M9f: Update ViewModel's songs list to remove the deleted track
+                playerViewModel.removeSongs(listOf(previousSong))
             }
             onQueueEnded()
             return
@@ -201,6 +203,9 @@ fun PlayerScreen(
         if (hideCurrent) {
             storageManager.hideTrack(previousSong)
             storageManager.deleteSong(previousSong)
+            // M9f: Update ViewModel's songs list to remove the deleted track
+            // This ensures getVisibleQueue() recomputes with the correct set of songs
+            playerViewModel.removeSongs(listOf(previousSong))
         }
 
         // Advance the active song before the service switch so any stale delayed saves
@@ -231,6 +236,9 @@ fun PlayerScreen(
                     Log.d("PlayerScreen", "Track is not bookmarked, hiding and deleting")
                     storageManager.hideTrack(song)
                     storageManager.deleteSong(song)
+                    // M9f: Update ViewModel's songs list to remove the deleted track
+                    // This ensures getVisibleQueue() recomputes with the correct set of songs
+                    playerViewModel.removeSongs(listOf(song))
                     // M9f: Signal SongListScreen to refresh its hidden tracks
                     playerViewModel.signalTracksDeleted()
                 }
