@@ -36,6 +36,7 @@ class PlayerViewModel : ViewModel() {
 
     // Reference to the service (set when available)
     private var playerService: PlayerService? = null
+    private var playStateCollectionJob: kotlinx.coroutines.Job? = null
 
     private val _currentPosition = MutableStateFlow(0L)
     val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
@@ -122,15 +123,26 @@ class PlayerViewModel : ViewModel() {
     }
 
     fun setPlayerService(service: PlayerService) {
+        // Cancel any previous collection job to avoid multiple collectors
+        playStateCollectionJob?.cancel()
+        
         playerService = service
         // Start collecting from the service's isPlayingState
-        viewModelScope.launch {
+        playStateCollectionJob = viewModelScope.launch {
             service.isPlayingState.collect { isPlayingFromService ->
                 _isPlaying.value = isPlayingFromService
             }
         }
         // Sync the current state immediately
         _isPlaying.value = service.isPlaying()
+    }
+
+    fun syncIsPlayingFromService() {
+        // Synchronously sync the current playing state from the service
+        // Use this when the screen resumes from background to catch any state changes
+        playerService?.let {
+            _isPlaying.value = it.isPlaying()
+        }
     }
 
     fun setIsPlaying(playing: Boolean) {

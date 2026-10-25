@@ -296,6 +296,16 @@ fun PlayerScreen(
     // Track whether this is the first time we've connected for this song
     // (removed local remember — now using ViewModel's persistent state)
 
+    // Sync ViewModel state from service when screen comes to foreground
+    // This catches state changes that happened while the app was backgrounded
+    LaunchedEffect(connected, service) {
+        if (connected && service != null) {
+            // Force sync of the playing state from the service
+            playerViewModel.syncIsPlayingFromService()
+            Log.d("PlayerScreen", "Re-synced ViewModel with service state on screen resume")
+        }
+    }
+
     // Restore saved position then start playing — only when the song actually changes
     LaunchedEffect(song, service, connected) {
         try {
