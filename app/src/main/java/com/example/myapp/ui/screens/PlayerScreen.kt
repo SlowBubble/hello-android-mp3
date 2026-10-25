@@ -64,16 +64,16 @@ fun PlayerScreen(
 
     val context = LocalContext.current
     val storageManager = remember { StorageManager(context) }
-    var playerQueueSortMode by remember {
-        mutableIntStateOf(
-            if (storageManager.getSortIndex() == SortMode.RANDOM.ordinal) {
-                SortMode.RANDOM.ordinal
-            } else {
-                SortMode.SHORTEST.ordinal
-            }
-        )
+    
+    // Read the sort mode from storage to maintain consistency with homepage order
+    val playerQueueSortMode by remember {
+        mutableIntStateOf(storageManager.getSortIndex())
     }
     var randomSortSeed by remember { mutableLongStateOf(storageManager.getRandomSortSeed()) }
+    
+    // Random checkbox state - controls whether Next button follows order or picks randomly
+    var useRandomNext by remember { mutableStateOf(false) }
+    
     var isBookmarked by remember(song.displayTitle) {
         mutableStateOf(storageManager.getBookmarkedTitles().contains(song.displayTitle))
     }
@@ -104,6 +104,14 @@ fun PlayerScreen(
     fun getNextTrackInSortOrder(): Song? {
         val queue = getVisibleQueue()
         val activeSongId = currentVmSongId ?: song.id
+        
+        // If random checkbox is enabled, pick a random track from the queue (excluding current)
+        if (useRandomNext) {
+            val availableTracks = queue.filter { it.id != activeSongId }
+            return availableTracks.randomOrNull()
+        }
+        
+        // Otherwise, follow the set order from the homepage
         return QueueUtils.nextTrack(queue, activeSongId)
     }
 
@@ -734,34 +742,40 @@ fun PlayerScreen(
                     }
                 }
 
-                // Sort and next buttons below progress bar
+                // Random checkbox and next buttons below progress bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Button(
-                        onClick = {
-                            playerQueueSortMode = if (playerQueueSortMode == SortMode.SHORTEST.ordinal) {
-                                SortMode.RANDOM.ordinal
-                            } else {
-                                SortMode.SHORTEST.ordinal
-                            }
-                            if (playerQueueSortMode == SortMode.RANDOM.ordinal) {
-                                randomSortSeed = storageManager.reshuffleTracks()
-                            }
-                            storageManager.setSortIndex(playerQueueSortMode)
-                        },
+                    // Random checkbox - controls whether Next follows order or picks randomly
+                    Row(
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        ),
+                            .height(48.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.15f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            )
+                            .clickable { useRandomNext = !useRandomNext }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
                     ) {
+                        Checkbox(
+                            checked = useRandomNext,
+                            onCheckedChange = { useRandomNext = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = Color.White,
+                                uncheckedColor = Color.White.copy(alpha = 0.6f),
+                                checkmarkColor = Color(0xFF7f1d1d)
+                            )
+                        )
                         Text(
-                            SortMode.values()[playerQueueSortMode].buttonText,
+                            "Random",
                             fontSize = 16.sp,
-                            color = Color.White
+                            color = Color.White,
+                            modifier = Modifier.padding(start = 4.dp)
                         )
                     }
 
