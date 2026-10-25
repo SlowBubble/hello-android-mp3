@@ -532,7 +532,7 @@ fun PlayerScreen(
                 }
             }
 
-            // Main track display with 45s skip buttons on sides
+            // Main track display with split skip buttons on sides
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -540,18 +540,52 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: -45s button
-                Button(
-                    onClick = { service?.let { onRewind45(it) } },
+                // Left: Split buttons for -1/10 duration (top) and -45s (bottom)
+                Column(
                     modifier = Modifier
                         .width(90.dp)
                         .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(alpha = 0.15f)
-                    ),
-                    contentPadding = PaddingValues(0.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("⏪", fontSize = 24.sp, color = Color.White)
+                    // Top: -1/10 of duration
+                    Button(
+                        onClick = { 
+                            service?.let { 
+                                val skipAmount = (duration / 10).toLong()
+                                it.seekTo((it.getCurrentPosition() - skipAmount).coerceAtLeast(0))
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text("⏪", fontSize = 12.sp, color = Color.White, lineHeight = 8.sp)
+                            Text("⏪", fontSize = 12.sp, color = Color.White, lineHeight = 8.sp)
+                        }
+                    }
+                    
+                    // Bottom: -45s
+                    Button(
+                        onClick = { service?.let { onRewind45(it) } },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("⏪", fontSize = 16.sp, color = Color.White)
+                    }
                 }
 
                 // Center: Track info
@@ -622,18 +656,52 @@ fun PlayerScreen(
                     }
                 }
 
-                // Right: +45s button
-                Button(
-                    onClick = { service?.let { onFastForward45(it) } },
+                // Right: Split buttons for +1/10 duration (top) and +45s (bottom)
+                Column(
                     modifier = Modifier
                         .width(90.dp)
                         .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(alpha = 0.15f)
-                    ),
-                    contentPadding = PaddingValues(0.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("⏩", fontSize = 24.sp, color = Color.White)
+                    // Top: +1/10 of duration
+                    Button(
+                        onClick = { 
+                            service?.let { 
+                                val skipAmount = (duration / 10).toLong()
+                                it.seekTo((it.getCurrentPosition() + skipAmount).coerceAtMost(duration))
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Text("⏩", fontSize = 12.sp, color = Color.White, lineHeight = 8.sp)
+                            Text("⏩", fontSize = 12.sp, color = Color.White, lineHeight = 8.sp)
+                        }
+                    }
+                    
+                    // Bottom: +45s
+                    Button(
+                        onClick = { service?.let { onFastForward45(it) } },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        ),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("⏩", fontSize = 16.sp, color = Color.White)
+                    }
                 }
             }
 
