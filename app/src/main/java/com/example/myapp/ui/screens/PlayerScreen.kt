@@ -160,7 +160,19 @@ fun PlayerScreen(
 
     fun moveToNextTrack(hideCurrent: Boolean) {
         val previousSong = song
-        val nextSong = getNextTrackInSortOrder() ?: return
+        val nextSong = getNextTrackInSortOrder()
+        
+        if (nextSong == null) {
+            Log.d("PlayerScreen", "moveToNextTrack: No more tracks in queue, checking for next folder")
+            // Save progress and optionally hide the current track before switching folders
+            saveProgressForSong(previousSong)
+            if (hideCurrent) {
+                storageManager.deleteSong(previousSong)
+            }
+            onQueueEnded()
+            return
+        }
+        
         val nextUri = nextSong.uri.toString()
 
         Log.d(
