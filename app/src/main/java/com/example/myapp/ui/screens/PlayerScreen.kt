@@ -649,7 +649,7 @@ fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 7-second skip buttons (above progress bar)
+                // 7-second skip buttons with speed control in the middle
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -664,6 +664,30 @@ fun PlayerScreen(
                         )
                     ) {
                         Text("⏪ -7s", fontSize = 14.sp, color = Color.White)
+                    }
+                    Button(
+                        onClick = {
+                            service?.let {
+                                playbackRate = it.getPlaybackRate()
+                                val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
+                                val currentIndex = rates.indexOf(playbackRate.let { rate ->
+                                    rates.minByOrNull { candidate ->
+                                        kotlin.math.abs(candidate - rate)
+                                    } ?: 1.0f
+                                })
+                                val nextIndex = (currentIndex + 1) % rates.size
+                                it.setPlaybackRate(rates[nextIndex])
+                                playbackRate = rates[nextIndex]
+                            }
+                        },
+                        modifier = Modifier
+                            .width(96.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
                     }
                     Button(
                         onClick = { service?.let { onFastForward(it) } },
@@ -776,7 +800,7 @@ fun PlayerScreen(
                     }
                 }
 
-                // Random checkbox and next buttons below progress bar
+                // Random checkbox and next button below progress bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -811,31 +835,6 @@ fun PlayerScreen(
                             color = Color.White,
                             modifier = Modifier.padding(start = 4.dp)
                         )
-                    }
-
-                    Button(
-                        onClick = {
-                            service?.let {
-                                playbackRate = it.getPlaybackRate()
-                                val rates = listOf(1.0f, 1.15f, 1.25f, 1.35f)
-                                val currentIndex = rates.indexOf(playbackRate.let { rate ->
-                                    rates.minByOrNull { candidate ->
-                                        kotlin.math.abs(candidate - rate)
-                                    } ?: 1.0f
-                                })
-                                val nextIndex = (currentIndex + 1) % rates.size
-                                it.setPlaybackRate(rates[nextIndex])
-                                playbackRate = rates[nextIndex]
-                            }
-                        },
-                        modifier = Modifier
-                            .width(96.dp)
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text(String.format("%.2fx", playbackRate), fontSize = 14.sp, color = Color.White)
                     }
 
                     Button(

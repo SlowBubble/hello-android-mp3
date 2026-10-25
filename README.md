@@ -1,4 +1,8 @@
+# m9h
+- Split the long -45s (and +45s) button into 2 vertically, where the bottom remains the same as before and the top become -1/10 (+1/10) of the total duration.
 
+# m9g
+- Let's move the 1.00x button to the middle of -7s and +7s
 # m9f
 - Fixed deletion behavior: All X buttons (homepage, hidden page, and player page) now properly hide tracks from the UI immediately before deleting the file. This prevents "ghost tracks" that were deleted but still appeared in the UI, which was causing m9a and m9b to malfunction.
 - Bookmarked tracks are preserved: When a track finishes naturally, bookmarked tracks are only hidden (not deleted) so they can be replayed later.
