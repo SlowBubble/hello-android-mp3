@@ -171,7 +171,7 @@ fun PlayerScreen(
         saveProgressForSong(previousSong)
 
         if (hideCurrent) {
-            storageManager.hideTrack(previousSong)
+            storageManager.deleteSong(previousSong)
         }
 
         // Advance the active song before the service switch so any stale delayed saves
@@ -193,7 +193,7 @@ fun PlayerScreen(
             try {
                 Log.d("PlayerScreen", "Track ended: ${song.title}")
                 saveProgress()
-                storageManager.hideTrack(song)
+                storageManager.deleteSong(song)
 
                 val nextSong = getNextTrackInSortOrder()
                 if (nextSong != null) {

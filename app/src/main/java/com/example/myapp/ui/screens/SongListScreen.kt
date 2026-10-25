@@ -764,13 +764,13 @@ fun SongListItemComposable(
                 }
             }
         } else {
-            // Home page: show hide button
+            // Home page: show delete button
             Button(
-                onClick = onHideClick,
+                onClick = { onDeleteClick?.invoke() },
                 modifier = Modifier
                     .size(50.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFFFFF).copy(alpha = 0.1f)
+                    containerColor = Color(0xFFFF4444).copy(alpha = 0.3f)
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
