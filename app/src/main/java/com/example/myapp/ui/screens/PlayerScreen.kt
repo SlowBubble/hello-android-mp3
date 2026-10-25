@@ -217,8 +217,16 @@ fun PlayerScreen(
             try {
                 Log.d("PlayerScreen", "Track ended: ${song.title}")
                 saveProgress()
-                storageManager.hideTrack(song)
-                storageManager.deleteSong(song)
+                
+                // If bookmarked, only hide (preserve file); otherwise hide and delete
+                if (isBookmarked) {
+                    Log.d("PlayerScreen", "Track is bookmarked, hiding only (not deleting)")
+                    storageManager.hideTrack(song)
+                } else {
+                    Log.d("PlayerScreen", "Track is not bookmarked, hiding and deleting")
+                    storageManager.hideTrack(song)
+                    storageManager.deleteSong(song)
+                }
 
                 val nextSong = getNextTrackInSortOrder()
                 if (nextSong != null) {

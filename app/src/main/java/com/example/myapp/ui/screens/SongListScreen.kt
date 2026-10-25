@@ -528,6 +528,7 @@ fun SongListScreen(
                                     hiddenTracksRefresh++
                                 },
                                 onDeleteClick = {
+                                    storageManager.hideTrack(song)
                                     storageManager.deleteSong(song)
                                     onSongsDeleted?.invoke(listOf(song))
                                     hiddenTracksRefresh++
