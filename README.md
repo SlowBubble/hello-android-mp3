@@ -1,3 +1,5 @@
+# m9j
+- X in the homepage is not actually deleting the video. What's wrong. Don't fix yet
 # m9i: Queue State Refactoring — Single Source of Truth
 
 # m9h

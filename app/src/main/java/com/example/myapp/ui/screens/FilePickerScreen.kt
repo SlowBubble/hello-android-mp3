@@ -37,7 +37,7 @@ fun FilePickerScreen(
             // Take a persistent permission so the URI survives app restarts
             context.contentResolver.takePersistableUriPermission(
                 it,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
             selectedFolder = it.toString()
             onFolderSelected(it.toString())
