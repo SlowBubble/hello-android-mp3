@@ -75,13 +75,15 @@ fun PlayerScreen(
     }
     
     // M9f Refactor: Initialize ViewModel sort mode and seed from storage on first load
+    // M10a: Initialize random enabled state from storage
     LaunchedEffect(Unit) {
         playerViewModel.setSortMode(storageManager.getSortIndex())
         playerViewModel.setRandomSortSeed(storageManager.getRandomSortSeed())
+        playerViewModel.setRandomEnabled(storageManager.isRandomEnabled())
     }
     
-    // Random checkbox state - controls whether Next button follows order or picks randomly
-    var useRandomNext by remember { mutableStateOf(false) }
+    // M10a: Collect randomEnabled from ViewModel (persistent state)
+    val randomEnabled by playerViewModel.randomEnabled.collectAsState()
     
     var isBookmarked by remember(song.displayTitle) {
         mutableStateOf(storageManager.getBookmarkedTitles().contains(song.displayTitle))
@@ -100,8 +102,8 @@ fun PlayerScreen(
     fun getNextTrackInSortOrder(): Song? {
         val activeSongId = currentVmSongId ?: song.id
         
-        // If random checkbox is enabled, pick a random track from the queue (excluding current)
-        if (useRandomNext) {
+        // M10a: If random enabled, pick a random track from the queue (excluding current)
+        if (randomEnabled) {
             val availableTracks = visibleSongs.filter { it.id != activeSongId }
             return availableTracks.randomOrNull()
         }
@@ -875,7 +877,8 @@ fun PlayerScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Random checkbox - controls whether Next follows order or picks randomly
+                    // M10a: Random checkbox - controls whether Next follows order or picks randomly
+                    // Uses ViewModel's persistent randomEnabled state
                     Row(
                         modifier = Modifier
                             .weight(1f)
@@ -884,14 +887,20 @@ fun PlayerScreen(
                                 color = Color.White.copy(alpha = 0.15f),
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                             )
-                            .clickable { useRandomNext = !useRandomNext }
+                            .clickable {
+                                playerViewModel.toggleRandomEnabled()
+                                storageManager.setRandomEnabled(!randomEnabled)
+                            }
                             .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Start
                     ) {
                         Checkbox(
-                            checked = useRandomNext,
-                            onCheckedChange = { useRandomNext = it },
+                            checked = randomEnabled,
+                            onCheckedChange = {
+                                playerViewModel.setRandomEnabled(it)
+                                storageManager.setRandomEnabled(it)
+                            },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = Color.White,
                                 uncheckedColor = Color.White.copy(alpha = 0.6f),

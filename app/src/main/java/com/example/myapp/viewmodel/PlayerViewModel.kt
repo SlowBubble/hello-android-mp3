@@ -37,6 +37,10 @@ class PlayerViewModel : ViewModel() {
     private val _randomSortSeed = MutableStateFlow(0L)
     val randomSortSeed: StateFlow<Long> = _randomSortSeed.asStateFlow()
 
+    // M10a: Track whether Random/shuffle mode is enabled
+    private val _randomEnabled = MutableStateFlow(false)
+    val randomEnabled: StateFlow<Boolean> = _randomEnabled.asStateFlow()
+
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
 
@@ -138,6 +142,16 @@ class PlayerViewModel : ViewModel() {
     // M9f Refactor: setRandomSortSeed updates the random seed for shuffle mode
     fun setRandomSortSeed(seed: Long) {
         _randomSortSeed.value = seed
+    }
+
+    // M10a: setRandomEnabled updates whether random/shuffle mode is enabled
+    fun setRandomEnabled(enabled: Boolean) {
+        _randomEnabled.value = enabled
+    }
+
+    // M10a: toggleRandomEnabled toggles random/shuffle mode
+    fun toggleRandomEnabled() {
+        _randomEnabled.value = !_randomEnabled.value
     }
 
     // M9f Refactor: hideTrack removes a track from the visible queue by adding it to hiddenTracks
