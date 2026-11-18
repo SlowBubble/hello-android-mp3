@@ -1,3 +1,8 @@
+# m10b
+- When cylcing thru folders, let's skip folders that says "No MP3 files found".
+- The button that displays the file name, you can strip out the prefix if it starts with "Pod "
+  - But add a prefix to it that shows the index "1: ", "2: ", ... (remember to skip folders with no more non-hidden MP3 files)
+
 # m10a
 - Keep track of whether Random is enabled
 

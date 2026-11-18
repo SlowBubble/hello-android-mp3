@@ -312,16 +312,63 @@ class StorageManager(private val context: Context) {
 
     fun getFolderDisplayName(uri: String, index: Int): String {
         val extracted = extractFolderName(uri)
-        return if (!extracted.isNullOrEmpty()) extracted else "Folder ${index + 1}"
+        val baseName = if (!extracted.isNullOrEmpty()) extracted else "Folder ${index + 1}"
+        
+        // M10b: Strip "Pod " prefix if present
+        val stripped = if (baseName.startsWith("Pod ")) {
+            baseName.removePrefix("Pod ")
+        } else {
+            baseName
+        }
+        
+        return stripped
     }
 
+    /**
+     * M10b: Check if a folder has any non-hidden MP3 files.
+     * Helper for computing visible folder indices.
+     */
+    private fun folderHasVisibleSongs(folderUri: String): Boolean {
+        return try {
+            val scanner = SongScanner(context)
+            val songs = scanner.scanFolderForMp3s(folderUri)
+            val hiddenTracks = getHiddenTracks().toSet()
+            songs.any { song -> !hiddenTracks.contains(song.title) }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * M10b: Get the current folder display name with index prefix.
+     * Index only counts folders with non-hidden MP3 files.
+     */
     fun getCurrentFolderDisplayName(): String {
         val history = getFolderHistory()
-        if (history.isNotEmpty()) {
-            val idx = getCurrentFolderIndex().coerceIn(0, history.size - 1)
-            return getFolderDisplayName(history[idx], idx)
+        if (history.isEmpty()) return "Folder"
+        
+        val currentIdx = getCurrentFolderIndex().coerceIn(0, history.size - 1)
+        val baseName = getFolderDisplayName(history[currentIdx], currentIdx)
+        
+        // Quick check: if only one folder, always show as "1:"
+        if (history.size == 1) {
+            return "1: $baseName"
         }
-        return "Folder"
+        
+        // Count how many folders with visible songs come before the current one
+        var visibleIndex = 1 // Start at 1 for 1-indexed display
+        for (i in 0 until currentIdx) {
+            if (folderHasVisibleSongs(history[i])) {
+                visibleIndex++
+            }
+        }
+        
+        // Only add prefix if current folder has visible songs
+        return if (folderHasVisibleSongs(history[currentIdx])) {
+            "$visibleIndex: $baseName"
+        } else {
+            baseName
+        }
     }
 
     fun setShowAllFolders(showAll: Boolean) {

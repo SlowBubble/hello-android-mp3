@@ -183,6 +183,7 @@ fun NavigationHost(
 
     /**
      * M8e: Cycle to the next folder that actually contains MP3s.
+     * M10b: Skip folders with no non-hidden MP3s when cycling.
      *
      * Folders with no MP3s are skipped and we keep cycling forward. The current
      * folder index only moves when a non-empty folder is found, so the UI never
@@ -203,8 +204,9 @@ fun NavigationHost(
 
         val currentIdx = storageManager.getCurrentFolderIndex()
         val scanner = SongScanner(context)
+        val hiddenTracks = storageManager.getHiddenTracks().toSet()
 
-        // Walk forward through every other folder, skipping any with no MP3s.
+        // Walk forward through every other folder, skipping any with no non-hidden MP3s.
         val foldersToCheck = history.size - 1
         var nextIdx = currentIdx
         var foundSongs: List<Song> = emptyList()
@@ -213,7 +215,9 @@ fun NavigationHost(
             nextIdx = (nextIdx + 1) % history.size
             checkedCount++
             try {
-                foundSongs = scanner.scanFolderForMp3s(history[nextIdx])
+                val allSongs = scanner.scanFolderForMp3s(history[nextIdx])
+                // Filter out hidden tracks to check if there are any visible songs
+                foundSongs = allSongs.filter { song -> !hiddenTracks.contains(song.title) }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Switch folder error at index $nextIdx", e)
                 // Keep cycling — a folder that errors out is treated like an empty one.
@@ -222,16 +226,20 @@ fun NavigationHost(
 
         if (foundSongs.isNotEmpty()) {
             storageManager.setCurrentFolderIndex(nextIdx)
-            playerViewModel.setSongs(foundSongs)
+            // Set all songs (not just visible ones) so hidden tracks are still available
+            val allSongs = scanner.scanFolderForMp3s(history[nextIdx])
+            playerViewModel.setSongs(allSongs)
             // Show overlay instead of clearing the song, so playback continues
             playerViewModel.showFolderSwitchOverlay()
         } else {
-            Toast.makeText(context, "No MP3 files found in other folders", Toast.LENGTH_SHORT).show()
+            // No folders with visible songs found
+            // (folders might have only hidden MP3s)
         }
     }
 
     /**
      * M9e: Switch folder from player page - stay on player and resume last played track
+     * M10b: Skip folders with no non-hidden MP3s when cycling.
      * If returning to a folder, resumes the track that was playing before.
      * If visiting a new folder, plays the first track.
      */
@@ -258,8 +266,9 @@ fun NavigationHost(
 
         val currentIdx = storageManager.getCurrentFolderIndex()
         val scanner = SongScanner(context)
+        val hiddenTracks = storageManager.getHiddenTracks().toSet()
 
-        // Walk forward through folders, skipping any with no MP3s
+        // Walk forward through folders, skipping any with no non-hidden MP3s
         val foldersToCheck = history.size - 1
         var nextIdx = currentIdx
         var foundSongs: List<Song> = emptyList()
@@ -268,7 +277,9 @@ fun NavigationHost(
             nextIdx = (nextIdx + 1) % history.size
             checkedCount++
             try {
-                foundSongs = scanner.scanFolderForMp3s(history[nextIdx])
+                val allSongs = scanner.scanFolderForMp3s(history[nextIdx])
+                // Filter out hidden tracks to check if there are any visible songs
+                foundSongs = allSongs.filter { song -> !hiddenTracks.contains(song.title) }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Switch folder from player error at index $nextIdx", e)
             }
@@ -278,15 +289,17 @@ fun NavigationHost(
             // Switch to the next folder
             val nextFolderUri = history[nextIdx]
             storageManager.setCurrentFolderIndex(nextIdx)
-            playerViewModel.setSongs(foundSongs)
+            // Set all songs (not just visible ones) so hidden tracks are still available
+            val allSongs = scanner.scanFolderForMp3s(nextFolderUri)
+            playerViewModel.setSongs(allSongs)
             
-            // Try to resume the last active track from this folder, otherwise play first track
-            val resumeSong = storageManager.getFolderLastTrackSong(nextFolderUri, foundSongs) ?: foundSongs.first()
+            // Try to resume the last active track from this folder, otherwise play first visible track
+            val resumeSong = storageManager.getFolderLastTrackSong(nextFolderUri, allSongs) ?: foundSongs.first()
             playerViewModel.selectSong(resumeSong, playing = true)
             
             Log.d("MainActivity", "Switched to folder at index $nextIdx, playing: ${resumeSong.title}")
         } else {
-            Toast.makeText(context, "No MP3 files found in other folders", Toast.LENGTH_SHORT).show()
+            // No folders with visible songs found
         }
     }
 
@@ -311,17 +324,20 @@ fun NavigationHost(
             return
         }
 
-        // After removal, cycle to the next available folder with songs
+        // After removal, cycle to the next available folder with non-hidden songs
         val scanner = SongScanner(context)
+        val hiddenTracks = storageManager.getHiddenTracks().toSet()
         val newIdx = storageManager.getCurrentFolderIndex()
         var foundSongs: List<Song> = emptyList()
         var checkedCount = 0
         var nextIdx = newIdx
 
-        // Try to find a folder with songs, checking up to the number of remaining folders
+        // Try to find a folder with non-hidden songs, checking up to the number of remaining folders
         while (foundSongs.isEmpty() && checkedCount < updatedHistory.size) {
             try {
-                foundSongs = scanner.scanFolderForMp3s(updatedHistory[nextIdx])
+                val allSongs = scanner.scanFolderForMp3s(updatedHistory[nextIdx])
+                // Filter out hidden tracks to check if there are any visible songs
+                foundSongs = allSongs.filter { song -> !hiddenTracks.contains(song.title) }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Remove folder scan error at index $nextIdx", e)
             }
@@ -335,17 +351,20 @@ fun NavigationHost(
 
         if (foundSongs.isNotEmpty()) {
             storageManager.setCurrentFolderIndex(nextIdx)
-            playerViewModel.setSongs(foundSongs)
+            // Set all songs (not just visible ones) so hidden tracks are still available
+            val allSongs = scanner.scanFolderForMp3s(updatedHistory[nextIdx])
+            playerViewModel.setSongs(allSongs)
             // Show overlay instead of clearing the song, so playback continues
             playerViewModel.showFolderSwitchOverlay()
             Toast.makeText(context, "Removed folder, switched to next", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(context, "No MP3 files found in remaining folders", Toast.LENGTH_SHORT).show()
+            // No folders with visible songs found
         }
     }
 
     /**
      * M9b: When the final track of a folder ends, automatically switch to the next folder
+     * M10b: Skip folders with no non-hidden MP3s when advancing.
      * and play the first track from that folder. If there's only one folder or no more folders,
      * return to the song list screen.
      */
@@ -359,9 +378,10 @@ fun NavigationHost(
             return
         }
 
-        // Try to find the next folder with songs
+        // Try to find the next folder with non-hidden songs
         val currentIdx = storageManager.getCurrentFolderIndex()
         val scanner = SongScanner(context)
+        val hiddenTracks = storageManager.getHiddenTracks().toSet()
         var foundSongs: List<Song> = emptyList()
         var nextIdx = currentIdx
         var checkedCount = 0
@@ -371,7 +391,9 @@ fun NavigationHost(
             nextIdx = (nextIdx + 1) % history.size
             checkedCount++
             try {
-                foundSongs = scanner.scanFolderForMp3s(history[nextIdx])
+                val allSongs = scanner.scanFolderForMp3s(history[nextIdx])
+                // Filter out hidden tracks to check if there are any visible songs
+                foundSongs = allSongs.filter { song -> !hiddenTracks.contains(song.title) }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Auto-advance folder scan error at index $nextIdx", e)
             }
@@ -380,15 +402,17 @@ fun NavigationHost(
         if (foundSongs.isNotEmpty()) {
             // Switch to the next folder
             storageManager.setCurrentFolderIndex(nextIdx)
-            playerViewModel.setSongs(foundSongs)
+            // Set all songs (not just visible ones) so hidden tracks are still available
+            val allSongs = scanner.scanFolderForMp3s(history[nextIdx])
+            playerViewModel.setSongs(allSongs)
             
-            // Auto-play the first track from the new folder
+            // Auto-play the first visible track from the new folder
             val firstSong = foundSongs.first()
             playerViewModel.selectSong(firstSong, playing = true)
             Log.d("MainActivity", "Auto-advanced to next folder, playing: ${firstSong.title}")
         } else {
-            // No more folders with songs, go back to song list
-            Log.d("MainActivity", "No more folders with songs, returning to song list")
+            // No more folders with visible songs, go back to song list
+            Log.d("MainActivity", "No more folders with visible songs, returning to song list")
             navController.popBackStack()
         }
     }
